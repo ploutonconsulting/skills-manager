@@ -22,17 +22,32 @@
     "recentActivity": "Recent Activity"
   },
   "mySkills": {
-    "title": "{{scenario}} Skills",
-    "viewAll": "View All Skills (cross-scenario)",
-    "searchPlaceholder": "Search in current scenario...",
+    "title": "My Skills",
+    "subtitle": "{{count}} skills from the central library are enabled in “{{scenario}}”",
+    "searchPlaceholder": "Search skills in the central library...",
     "allStatus": "All Status",
     "synced": "Synced",
     "sync": "Sync",
     "unsync": "Unsync",
+    "enable": "Enable",
+    "disable": "Disable",
+    "enableForScenario": "Enable for current scenario",
+    "disableForScenario": "Disable for current scenario",
+    "enabledInScenario": "Added to current scenario",
+    "disabledInScenario": "Removed from current scenario",
+    "inScenario": "Enabled in current scenario",
+    "notInScenario": "Not enabled in current scenario",
     "remove": "Remove from scenario",
     "viewDoc": "View docs",
-    "noSkills": "No skills in current scenario",
-    "addFirst": "Click \"Install Skills\" to get started"
+    "noSkills": "No skills to display",
+    "addFirst": "Click \"Install Skills\" to add skills into the central library",
+    "noMatch": "No skills match the current search or filter",
+    "noScenario": "No scenario is currently available",
+    "filters": {
+      "all": "All",
+      "enabled": "Enabled",
+      "available": "Available"
+    }
   },
   "install": {
     "title": "Install Skills",
@@ -85,6 +100,8 @@
     "syncModeDesc": "Symlinks are recommended — minimal disk usage with live updates.",
     "symlink": "Symlink",
     "copy": "File Copy",
+    "currentScenario": "Current Scenario",
+    "currentScenarioDesc": "Switch the app to another scenario and refresh active skills immediately.",
     "defaultScenario": "Default Startup Scenario",
     "defaultScenarioDesc": "Scenario loaded automatically on app launch.",
     "language": "Language",

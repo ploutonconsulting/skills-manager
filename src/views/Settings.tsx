@@ -20,7 +20,7 @@ import * as api from "../lib/tauri";
 
 export function Settings() {
   const { t, i18n } = useTranslation();
-  const { tools, scenarios, refreshTools } = useApp();
+  const { tools, scenarios, activeScenario, refreshTools, switchScenario } = useApp();
   const [syncMode, setSyncMode] = useState("symlink");
   const [defaultScenario, setDefaultScenario] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -49,6 +49,12 @@ export function Settings() {
   const handleDefaultScenarioChange = async (id: string) => {
     setDefaultScenario(id);
     await api.setSettings("default_scenario", id);
+  };
+
+  const handleActiveScenarioChange = async (id: string) => {
+    if (!id) return;
+    await switchScenario(id);
+    toast.success(t("scenario.switched", { name: scenarios.find((scenario) => scenario.id === id)?.name || "" }));
   };
 
   const handleLanguageChange = (lng: string) => {
@@ -163,6 +169,27 @@ export function Settings() {
                   <Copy className="w-4 h-4" /> {t("settings.copy")}
                 </button>
               </div>
+            </div>
+
+            <div className="p-5 flex items-center justify-between">
+              <div>
+                <h3 className="text-zinc-200 font-medium mb-1">{t("settings.currentScenario")}</h3>
+                <p className="text-zinc-500 text-sm">{t("settings.currentScenarioDesc")}</p>
+              </div>
+              <select
+                value={activeScenario?.id || ""}
+                onChange={(e) => handleActiveScenarioChange(e.target.value)}
+                className="bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500/50"
+              >
+                <option value="" disabled>
+                  —
+                </option>
+                {scenarios.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="p-5 flex items-center justify-between">

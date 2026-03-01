@@ -42,8 +42,25 @@ export function MySkills() {
   }, []);
 
   useEffect(() => {
-    loadSkills();
-  }, [loadSkills]);
+    let cancelled = false;
+
+    const init = async () => {
+      try {
+        const managedSkills = await api.getManagedSkills();
+        if (!cancelled) {
+          setSkills(managedSkills);
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    void init();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const enabledCount = activeScenario
     ? skills.filter((skill) => skill.scenario_ids.includes(activeScenario.id)).length

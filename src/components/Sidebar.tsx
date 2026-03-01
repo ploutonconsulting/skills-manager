@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Hammer,
@@ -68,7 +68,7 @@ export function Sidebar() {
   return (
     <>
       <div className="w-[240px] flex-shrink-0 bg-[#0F0F0F] border-r border-[#1C1C1C] h-full flex flex-col select-none relative z-10">
-        <div className="h-10 w-full" style={{ WebkitAppRegion: "drag" } as any} />
+        <div className="h-10 w-full" style={{ WebkitAppRegion: "drag" } as CSSProperties} />
 
         <div className="px-4 pb-4">
           <div className="flex items-center gap-2 mb-6 text-zinc-300 font-semibold text-sm">
@@ -124,7 +124,7 @@ export function Sidebar() {
                   <span className="flex-1 truncate">{scenario.name}</span>
                   <span
                     onClick={(event) => handleRenameClick(event, scenario.id)}
-                    className="rounded p-1 text-zinc-600 opacity-0 transition hover:bg-[#1C1C1C] hover:text-zinc-300 group-hover:opacity-100"
+                    className="cursor-pointer rounded p-1 text-zinc-600 opacity-0 transition hover:bg-[#1C1C1C] hover:text-zinc-300 group-hover:opacity-100"
                     title={t("common.rename")}
                   >
                     <Pencil className="h-3 w-3" />

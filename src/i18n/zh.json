@@ -22,17 +22,32 @@
     "recentActivity": "近期动态"
   },
   "mySkills": {
-    "title": "{{scenario}}场景 Skills",
-    "viewAll": "查看全部 Skills (跨场景)",
-    "searchPlaceholder": "在当前场景中搜索...",
+    "title": "我的 Skills",
+    "subtitle": "中央仓库共 {{count}} 个 Skills 已在“{{scenario}}”场景中启用",
+    "searchPlaceholder": "搜索中央仓库中的 Skills...",
     "allStatus": "全部状态",
     "synced": "已同步",
     "sync": "同步",
     "unsync": "取消同步",
+    "enable": "启用",
+    "disable": "停用",
+    "enableForScenario": "启用到当前场景",
+    "disableForScenario": "从当前场景停用",
+    "enabledInScenario": "已加入当前场景",
+    "disabledInScenario": "已从当前场景移除",
+    "inScenario": "当前场景已启用",
+    "notInScenario": "当前场景未启用",
     "remove": "从当前场景移除",
     "viewDoc": "查看文档",
-    "noSkills": "当前场景还没有 Skills",
-    "addFirst": "点击\"安装 Skills\"开始添加"
+    "noSkills": "没有可显示的 Skills",
+    "addFirst": "点击“安装 Skills”开始添加到中央仓库",
+    "noMatch": "没有符合当前搜索或筛选条件的 Skills",
+    "noScenario": "当前还没有可用场景",
+    "filters": {
+      "all": "全部",
+      "enabled": "当前场景已启用",
+      "available": "当前场景未启用"
+    }
   },
   "install": {
     "title": "安装 Skills",
@@ -85,6 +100,8 @@
     "syncModeDesc": "推荐使用符号链接，占用空间极小且修改可实时生效。",
     "symlink": "符号链接",
     "copy": "文件复制",
+    "currentScenario": "当前场景",
+    "currentScenarioDesc": "立即切换应用当前使用的场景，并刷新 Skills 配置。",
     "defaultScenario": "默认启动场景",
     "defaultScenarioDesc": "应用启动时自动加载的场景。",
     "language": "语言 (Language)",
