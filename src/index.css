@@ -5,11 +5,11 @@
 @layer base {
   body {
     @apply bg-background text-zinc-200 font-sans antialiased overflow-hidden;
+    letter-spacing: -0.014em;
   }
 }
 
 @layer components {
-  /* Scrollbar hide utility */
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }

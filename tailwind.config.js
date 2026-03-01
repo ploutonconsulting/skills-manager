@@ -7,22 +7,26 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: '#0A0A0A',
-        surface: '#121212',
-        border: '#2A2A2A'
+        background: '#0C0C10',
+        surface: '#131318',
+        border: '#22222C',
+        'border-subtle': '#1C1C24',
       },
       fontFamily: {
         sans: [
           '-apple-system',
           'BlinkMacSystemFont',
           '"Segoe UI"',
-          'Roboto',
-          'Helvetica',
-          'Arial',
+          'system-ui',
           'sans-serif',
-          '"Apple Color Emoji"',
-          '"Segoe UI Emoji"',
-          '"Segoe UI Symbol"',
+        ],
+        mono: [
+          '"SF Mono"',
+          '"Fira Code"',
+          '"JetBrains Mono"',
+          'Menlo',
+          'Monaco',
+          'monospace',
         ],
       },
     },

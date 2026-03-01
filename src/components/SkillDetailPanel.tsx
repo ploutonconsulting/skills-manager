@@ -29,45 +29,48 @@ export function SkillDetailPanel({ skill, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative ml-auto w-full max-w-2xl bg-[#0F0F0F] border-l border-[#1C1C1C] h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative ml-auto w-full max-w-xl bg-[#0F0F14] border-l border-[#1C1C24] h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-[#1C1C1C]">
-          <div>
-            <h2 className="text-lg font-semibold text-white">{skill.name}</h2>
+        <div className="flex items-start justify-between px-5 py-4 border-b border-[#1C1C24]">
+          <div className="min-w-0 mr-3">
+            <h2 className="text-[14px] font-semibold text-zinc-100 truncate">{skill.name}</h2>
             {skill.description && (
-              <p className="text-sm text-zinc-500 mt-1">{skill.description}</p>
+              <p className="text-[12px] text-zinc-600 mt-0.5 line-clamp-2">{skill.description}</p>
             )}
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 p-1.5 rounded-md hover:bg-[#1A1A1A]">
-            <X className="w-5 h-5" />
+          <button
+            onClick={onClose}
+            className="text-zinc-600 hover:text-zinc-300 p-1.5 rounded-[4px] hover:bg-[#1C1C24] transition-colors outline-none shrink-0"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Meta */}
-        <div className="px-6 py-4 border-b border-[#1C1C1C] flex items-center gap-4 text-xs text-zinc-500">
+        <div className="px-5 py-2.5 border-b border-[#1C1C24] flex items-center gap-4 text-[11px] text-zinc-600">
           <div className="flex items-center gap-1.5">
-            <FileText className="w-3.5 h-3.5" />
+            <FileText className="w-3 h-3" />
             {doc?.filename || "—"}
           </div>
-          <div className="flex items-center gap-1.5">
-            <Folder className="w-3.5 h-3.5" />
-            <span className="font-mono truncate max-w-[300px]">{skill.central_path}</span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Folder className="w-3 h-3 shrink-0" />
+            <span className="font-mono truncate">{skill.central_path}</span>
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
+        <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-hide">
           {loading ? (
-            <div className="text-zinc-500 text-center mt-12">加载中...</div>
+            <div className="text-[12px] text-zinc-600 text-center mt-12">加载中...</div>
           ) : doc ? (
-            <article className="prose prose-invert prose-sm max-w-none prose-headings:text-zinc-200 prose-p:text-zinc-400 prose-a:text-indigo-400 prose-code:text-indigo-300 prose-code:bg-[#1C1C1C] prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-[#0A0A0A] prose-pre:border prose-pre:border-[#2A2A2A]">
+            <article className="prose prose-invert prose-sm max-w-none prose-headings:text-zinc-200 prose-p:text-zinc-500 prose-a:text-indigo-400 prose-code:text-indigo-300 prose-code:bg-[#1C1C24] prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-[#0C0C10] prose-pre:border prose-pre:border-[#1C1C24]">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {doc.content}
               </ReactMarkdown>
             </article>
           ) : (
-            <div className="text-zinc-500 text-center mt-12">没有找到文档文件</div>
+            <div className="text-[12px] text-zinc-600 text-center mt-12">没有找到文档文件</div>
           )}
         </div>
       </div>

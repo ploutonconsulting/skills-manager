@@ -43,24 +43,12 @@ export function MySkills() {
       skill.name.toLowerCase().includes(search.toLowerCase()) ||
       (skill.description || "").toLowerCase().includes(search.toLowerCase());
 
-    if (!matchesSearch) {
-      return false;
-    }
-
-    if (!activeScenario) {
-      return true;
-    }
+    if (!matchesSearch) return false;
+    if (!activeScenario) return true;
 
     const enabledInScenario = skill.scenario_ids.includes(activeScenario.id);
-
-    if (filterMode === "enabled") {
-      return enabledInScenario;
-    }
-
-    if (filterMode === "available") {
-      return !enabledInScenario;
-    }
-
+    if (filterMode === "enabled") return enabledInScenario;
+    if (filterMode === "available") return !enabledInScenario;
     return true;
   });
 
@@ -84,11 +72,8 @@ export function MySkills() {
 
   const handleDeleteManagedSkill = async () => {
     if (!deleteTarget) return;
-
     await api.deleteManagedSkill(deleteTarget.id);
-    if (selectedSkill?.id === deleteTarget.id) {
-      setSelectedSkill(null);
-    }
+    if (selectedSkill?.id === deleteTarget.id) setSelectedSkill(null);
     toast.success(`${deleteTarget.name} ${t("mySkills.deleted")}`);
     setDeleteTarget(null);
     await Promise.all([refreshManagedSkills(), refreshScenarios()]);
@@ -96,7 +81,6 @@ export function MySkills() {
 
   const handleToggleScenario = async (skill: ManagedSkill) => {
     if (!activeScenario) return;
-
     const enabledInScenario = skill.scenario_ids.includes(activeScenario.id);
     if (enabledInScenario) {
       await api.removeSkillFromScenario(skill.id, activeScenario.id);
@@ -105,7 +89,6 @@ export function MySkills() {
       await api.addSkillToScenario(skill.id, activeScenario.id);
       toast.success(`${skill.name} ${t("mySkills.enabledInScenario")}`);
     }
-
     await Promise.all([refreshManagedSkills(), refreshScenarios()]);
   };
 
@@ -113,54 +96,56 @@ export function MySkills() {
     switch (type) {
       case "git":
       case "skillssh":
-        return <Github className="w-3.5 h-3.5" />;
+        return <Github className="w-3 h-3" />;
       case "local":
       case "import":
-        return <HardDrive className="w-3.5 h-3.5" />;
+        return <HardDrive className="w-3 h-3" />;
       default:
-        return <Globe className="w-3.5 h-3.5" />;
+        return <Globe className="w-3 h-3" />;
     }
   };
 
   return (
-    <div className="mx-auto flex h-full max-w-[1200px] flex-col animate-in fade-in duration-500">
-      <div className="mb-8 pr-2">
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-white">
+    <div className="mx-auto flex h-full max-w-[1200px] flex-col animate-in fade-in duration-400">
+      {/* Header */}
+      <div className="mb-5 pr-2">
+        <h1 className="flex items-center gap-2.5 text-[16px] font-semibold text-zinc-100">
           {t("mySkills.title")}
-          <span className="rounded-full border border-[#2A2A2A] bg-[#1C1C1C] px-2.5 py-1 text-sm font-medium text-zinc-400">
+          <span className="rounded-full border border-[#22222C] bg-[#1C1C24] px-2.5 py-0.5 text-[12px] font-medium text-zinc-500">
             {skills.length}
           </span>
         </h1>
-        <p className="mt-2 text-sm text-zinc-500">
+        <p className="mt-1.5 text-[13px] text-zinc-600">
           {activeScenario
             ? t("mySkills.subtitle", { scenario: activeScenario.name, count: enabledCount })
             : t("mySkills.noScenario")}
         </p>
       </div>
 
-      <div className="mb-6 flex items-center justify-between gap-4">
+      {/* Toolbar */}
+      <div className="mb-5 flex items-center justify-between gap-4">
         <div className="flex flex-1 gap-3">
-          <div className="relative max-w-sm w-full">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+          <div className="relative max-w-[260px] w-full">
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-600" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t("mySkills.searchPlaceholder")}
-              className="w-full rounded-lg border border-[#2A2A2A] bg-[#121212] py-2 pl-9 pr-4 text-sm font-medium text-zinc-200 placeholder-zinc-500 transition-all focus:border-indigo-500/50 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
+              className="w-full rounded-[5px] border border-[#1C1C24] bg-[#131318] h-[34px] pl-9 pr-3 text-[13px] font-medium text-zinc-200 placeholder-zinc-700 transition-all focus:border-[#22222C] focus:outline-none"
             />
           </div>
 
-          <div className="flex rounded-lg border border-[#2A2A2A] bg-[#121212] p-1">
+          <div className="flex rounded-[5px] border border-[#1C1C24] bg-[#131318] p-0.5">
             {(["all", "enabled", "available"] as const).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setFilterMode(mode)}
                 className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors outline-none",
+                  "rounded-[4px] px-3 py-1.5 text-[12px] font-medium transition-colors outline-none",
                   filterMode === mode
-                    ? "bg-[#252528] text-zinc-200 shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-300"
+                    ? "bg-[#1E1E2A] text-zinc-200"
+                    : "text-zinc-600 hover:text-zinc-400"
                 )}
               >
                 {t(`mySkills.filters.${mode}`)}
@@ -169,14 +154,12 @@ export function MySkills() {
           </div>
         </div>
 
-        <div className="flex rounded-lg border border-[#2A2A2A] bg-[#121212] p-1">
+        <div className="flex rounded-[5px] border border-[#1C1C24] bg-[#131318] p-0.5">
           <button
             onClick={() => setViewMode("grid")}
             className={cn(
-              "rounded-md p-1.5 transition-colors outline-none",
-              viewMode === "grid"
-                ? "bg-[#252528] text-zinc-200 shadow-sm"
-                : "text-zinc-500 hover:text-zinc-300"
+              "rounded-[4px] p-2 transition-colors outline-none",
+              viewMode === "grid" ? "bg-[#1E1E2A] text-zinc-200" : "text-zinc-600 hover:text-zinc-400"
             )}
           >
             <LayoutGrid className="h-4 w-4" />
@@ -184,10 +167,8 @@ export function MySkills() {
           <button
             onClick={() => setViewMode("list")}
             className={cn(
-              "rounded-md p-1.5 transition-colors outline-none",
-              viewMode === "list"
-                ? "bg-[#252528] text-zinc-200 shadow-sm"
-                : "text-zinc-500 hover:text-zinc-300"
+              "rounded-[4px] p-2 transition-colors outline-none",
+              viewMode === "list" ? "bg-[#1E1E2A] text-zinc-200" : "text-zinc-600 hover:text-zinc-400"
             )}
           >
             <List className="h-4 w-4" />
@@ -197,19 +178,19 @@ export function MySkills() {
 
       {filtered.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center pb-20 text-center">
-          <Layers className="mb-4 h-12 w-12 text-zinc-700" />
-          <h3 className="mb-2 text-lg font-semibold text-zinc-400">{t("mySkills.noSkills")}</h3>
-          <p className="text-sm text-zinc-600">
+          <Layers className="mb-4 h-12 w-12 text-zinc-800" />
+          <h3 className="mb-1.5 text-[14px] font-semibold text-zinc-500">{t("mySkills.noSkills")}</h3>
+          <p className="text-[13px] text-zinc-700">
             {skills.length === 0 ? t("mySkills.addFirst") : t("mySkills.noMatch")}
           </p>
         </div>
       ) : (
         <div
           className={cn(
-            "pb-12",
+            "pb-8",
             viewMode === "grid"
-              ? "grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3"
-              : "flex flex-col gap-1.5"
+              ? "grid grid-cols-2 gap-3 lg:grid-cols-3"
+              : "flex flex-col gap-0.5"
           )}
         >
           {filtered.map((skill) => {
@@ -225,27 +206,25 @@ export function MySkills() {
               return (
                 <div
                   key={skill.id}
-                  className="group relative flex flex-col overflow-hidden rounded-lg border border-[#1E1E20] bg-[#111113] transition-all hover:border-[#333] hover:bg-[#141416]"
+                  className="group relative flex flex-col overflow-hidden rounded-lg border border-[#1C1C24] bg-[#131318] transition-all hover:border-[#2A2A38] hover:bg-[#17171F]"
                 >
-                  {/* Header row: name + status indicators */}
-                  <div className="flex items-start gap-2 px-3 pt-3 pb-1">
-                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                      {isSynced ? (
-                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                      ) : (
-                        <Circle className="h-3.5 w-3.5 shrink-0 text-zinc-600" />
-                      )}
-                      <h3
-                        className="truncate text-[13px] font-semibold text-zinc-100 cursor-pointer hover:text-white"
-                        onClick={() => setSelectedSkill(skill)}
-                        title={skill.name}
-                      >
-                        {skill.name}
-                      </h3>
-                    </div>
+                  {/* Header */}
+                  <div className="flex items-center gap-2.5 px-3.5 pt-3 pb-1.5">
+                    {isSynced ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                    ) : (
+                      <Circle className="h-3.5 w-3.5 shrink-0 text-zinc-700" />
+                    )}
+                    <h3
+                      className="flex-1 truncate text-[14px] font-semibold text-zinc-100 cursor-pointer hover:text-white"
+                      onClick={() => setSelectedSkill(skill)}
+                      title={skill.name}
+                    >
+                      {skill.name}
+                    </h3>
                     <button
                       onClick={() => setDeleteTarget(skill)}
-                      className="shrink-0 rounded p-0.5 text-zinc-600 opacity-0 transition-all group-hover:opacity-100 hover:text-red-400"
+                      className="shrink-0 rounded p-1 text-zinc-700 opacity-0 transition-all group-hover:opacity-100 hover:text-red-400"
                       title={t("mySkills.delete")}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -253,36 +232,36 @@ export function MySkills() {
                   </div>
 
                   {/* Description */}
-                  <p className="px-3 text-[12px] leading-[18px] text-zinc-500 line-clamp-2 min-h-[36px]">
+                  <p className="px-3.5 text-[12px] leading-[18px] text-zinc-600 truncate">
                     {skill.description || "—"}
                   </p>
 
-                  {/* Footer: meta + actions */}
-                  <div className="mt-auto flex items-center justify-between gap-2 border-t border-[#1A1A1C] px-3 py-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className="inline-flex items-center gap-1 text-[10px] text-zinc-600">
+                  {/* Footer */}
+                  <div className="mt-auto flex items-center justify-between gap-2 border-t border-[#1C1C24] px-3.5 py-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="inline-flex items-center gap-1 text-[11px] text-zinc-700 shrink-0">
                         {sourceIcon(skill.source_type)}
                         {sourceTypeLabel}
                       </span>
-                      <span className="text-zinc-700">·</span>
+                      <span className="text-zinc-800">·</span>
                       <span
                         className={cn(
-                          "text-[10px] font-medium",
-                          enabledInScenario ? "text-amber-400/80" : "text-zinc-600"
+                          "text-[11px] font-medium truncate",
+                          enabledInScenario ? "text-amber-400/80" : "text-zinc-700"
                         )}
                       >
                         {enabledInScenario ? activeScenarioName : t("mySkills.notInScenario")}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         onClick={() => handleToggleScenario(skill)}
                         disabled={!activeScenario}
                         className={cn(
-                          "rounded px-2 py-0.5 text-[11px] font-medium transition-colors outline-none",
+                          "rounded px-2 py-1 text-[12px] font-medium transition-colors outline-none",
                           enabledInScenario
                             ? "text-emerald-400 hover:bg-emerald-500/10"
-                            : "text-zinc-500 hover:bg-[#1E1E20] hover:text-zinc-300"
+                            : "text-zinc-600 hover:bg-[#1C1C24] hover:text-zinc-300"
                         )}
                       >
                         {enabledInScenario ? t("mySkills.disable") : (
@@ -295,9 +274,9 @@ export function MySkills() {
                       <button
                         onClick={() => (isSynced ? handleUnsync(skill) : handleSync(skill))}
                         className={cn(
-                          "rounded px-2 py-0.5 text-[11px] font-medium transition-colors outline-none",
+                          "rounded px-2 py-1 text-[12px] font-medium transition-colors outline-none",
                           isSynced
-                            ? "text-zinc-400 hover:bg-[#1E1E20] hover:text-red-400"
+                            ? "text-zinc-500 hover:bg-[#1C1C24] hover:text-red-400"
                             : "text-indigo-400 hover:bg-indigo-500/10"
                         )}
                       >
@@ -313,55 +292,50 @@ export function MySkills() {
             return (
               <div
                 key={skill.id}
-                className="group flex items-center gap-3 rounded-lg border border-transparent bg-[#111113] px-3 py-2 transition-all hover:border-[#252528] hover:bg-[#141416]"
+                className="group flex items-center gap-3.5 rounded-[5px] border border-transparent bg-[#131318] px-3.5 py-2.5 transition-all hover:border-[#22222C] hover:bg-[#17171F]"
               >
-                {/* Sync indicator dot */}
                 {isSynced ? (
                   <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
                 ) : (
-                  <Circle className="h-3.5 w-3.5 shrink-0 text-zinc-600" />
+                  <Circle className="h-3.5 w-3.5 shrink-0 text-zinc-700" />
                 )}
 
-                {/* Name */}
                 <h3
-                  className="w-[180px] shrink-0 truncate text-[13px] font-semibold text-zinc-200 cursor-pointer hover:text-white"
+                  className="w-[180px] shrink-0 truncate text-[14px] font-semibold text-zinc-200 cursor-pointer hover:text-white"
                   onClick={() => setSelectedSkill(skill)}
                   title={skill.name}
                 >
                   {skill.name}
                 </h3>
 
-                {/* Description */}
-                <p className="min-w-0 flex-1 truncate text-[12px] text-zinc-500">
+                <p className="min-w-0 flex-1 truncate text-[12px] text-zinc-600">
                   {skill.description || "—"}
                 </p>
 
-                {/* Meta tags */}
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className="inline-flex items-center gap-1 text-[10px] text-zinc-600">
+                <div className="flex shrink-0 items-center gap-2.5">
+                  <span className="inline-flex items-center gap-1 text-[11px] text-zinc-700">
                     {sourceIcon(skill.source_type)}
                     {sourceTypeLabel}
                   </span>
                   <span
                     className={cn(
-                      "text-[10px] font-medium",
-                      enabledInScenario ? "text-amber-400/80" : "text-zinc-600"
+                      "text-[11px] font-medium",
+                      enabledInScenario ? "text-amber-400/80" : "text-zinc-700"
                     )}
                   >
                     {enabledInScenario ? activeScenarioName : t("mySkills.notInScenario")}
                   </span>
                 </div>
 
-                {/* Actions */}
-                <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="flex shrink-0 items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
                   <button
                     onClick={() => handleToggleScenario(skill)}
                     disabled={!activeScenario}
                     className={cn(
-                      "rounded px-2 py-0.5 text-[11px] font-medium transition-colors outline-none",
+                      "rounded px-2 py-1 text-[12px] font-medium transition-colors outline-none",
                       enabledInScenario
                         ? "text-emerald-400 hover:bg-emerald-500/10"
-                        : "text-zinc-500 hover:bg-[#1E1E20] hover:text-zinc-300"
+                        : "text-zinc-600 hover:bg-[#1C1C24] hover:text-zinc-300"
                     )}
                   >
                     {enabledInScenario ? t("mySkills.disable") : t("mySkills.enable")}
@@ -369,9 +343,9 @@ export function MySkills() {
                   <button
                     onClick={() => (isSynced ? handleUnsync(skill) : handleSync(skill))}
                     className={cn(
-                      "rounded px-2 py-0.5 text-[11px] font-medium transition-colors outline-none",
+                      "rounded px-2 py-1 text-[12px] font-medium transition-colors outline-none",
                       isSynced
-                        ? "text-zinc-400 hover:text-red-400"
+                        ? "text-zinc-500 hover:text-red-400"
                         : "text-indigo-400 hover:bg-indigo-500/10"
                     )}
                   >
@@ -379,7 +353,7 @@ export function MySkills() {
                   </button>
                   <button
                     onClick={() => setDeleteTarget(skill)}
-                    className="rounded p-0.5 text-zinc-600 transition-colors hover:text-red-400"
+                    className="rounded p-1 text-zinc-700 transition-colors hover:text-red-400"
                     title={t("mySkills.delete")}
                   >
                     <Trash2 className="h-3.5 w-3.5" />

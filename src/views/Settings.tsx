@@ -28,12 +28,8 @@ export function Settings() {
   const [openingRepo, setOpeningRepo] = useState(false);
 
   useEffect(() => {
-    api.getSettings("sync_mode").then((v) => {
-      if (v) setSyncMode(v);
-    });
-    api.getSettings("default_scenario").then((v) => {
-      if (v) setDefaultScenario(v);
-    });
+    api.getSettings("sync_mode").then((v) => { if (v) setSyncMode(v); });
+    api.getSettings("default_scenario").then((v) => { if (v) setDefaultScenario(v); });
   }, []);
 
   const handleRefresh = async () => {
@@ -56,7 +52,7 @@ export function Settings() {
   const handleActiveScenarioChange = async (id: string) => {
     if (!id) return;
     await switchScenario(id);
-    toast.success(t("scenario.switched", { name: scenarios.find((scenario) => scenario.id === id)?.name || "" }));
+    toast.success(t("scenario.switched", { name: scenarios.find((s) => s.id === id)?.name || "" }));
   };
 
   const handleLanguageChange = (lng: string) => {
@@ -76,186 +72,180 @@ export function Settings() {
     }
   };
 
+  const selectClass = "bg-[#0C0C10] border border-[#1C1C24] rounded-[4px] px-3 py-1.5 text-[12px] text-zinc-200 focus:outline-none focus:border-[#22222C] transition-colors";
+
   return (
-    <div className="max-w-[1000px] mx-auto h-full flex flex-col animate-in fade-in duration-500 pb-12">
-      <div className="mb-8 border-b border-[#1C1C1C] pb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-          <Settings2 className="w-6 h-6 text-indigo-400" />
+    <div className="max-w-[1000px] mx-auto h-full flex flex-col animate-in fade-in duration-400 pb-8">
+      {/* Header */}
+      <div className="mb-5 pb-4 border-b border-[#1C1C24]">
+        <h1 className="text-[15px] font-semibold text-zinc-100 flex items-center gap-2">
+          <Settings2 className="w-4 h-4 text-indigo-400" />
           {t("settings.title")}
         </h1>
       </div>
 
-      <div className="space-y-10">
+      <div className="space-y-6">
+        {/* Agent status */}
         <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-zinc-200">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-[11px] font-semibold text-zinc-600 uppercase tracking-[0.08em]">
               {t("settings.supportedAgents")} ({tools.filter((t) => t.installed).length}/{tools.length})
             </h2>
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="flex items-center gap-2 text-sm text-indigo-400 hover:text-indigo-300 transition-colors font-medium"
+              className="flex items-center gap-1.5 text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors font-medium outline-none"
             >
               {refreshing ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <RefreshCw className="w-4 h-4" />
+                <RefreshCw className="w-3.5 h-3.5" />
               )}
               {t("settings.refresh")}
             </button>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-2 md:grid-cols-4">
             {tools.map((agent, i) => (
               <div
                 key={i}
                 className={cn(
-                  "flex items-center justify-between p-3 rounded-lg border transition-colors",
+                  "flex items-center gap-2 p-2.5 rounded-[4px] border transition-colors",
                   agent.installed
-                    ? "bg-[#121212] border-[#2A2A2A] hover:border-[#3A3A3A]"
-                    : "bg-[#0A0A0A] border-[#1C1C1C] opacity-60 grayscale"
+                    ? "bg-[#131318] border-[#1C1C24] hover:border-[#22222C]"
+                    : "bg-[#0F0F14] border-[#1C1C24] opacity-50"
                 )}
               >
-                <div className="flex items-center gap-3">
-                  {agent.installed ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                  ) : (
-                    <Circle className="w-5 h-5 text-zinc-600" />
-                  )}
-                  <div>
-                    <h3
-                      className={cn(
-                        "text-sm font-medium",
-                        agent.installed ? "text-zinc-200" : "text-zinc-500"
-                      )}
-                    >
-                      {agent.display_name}
-                    </h3>
-                    <p className="text-[10px] text-zinc-600 truncate max-w-[120px]" title={agent.skills_dir}>
-                      {agent.installed ? agent.skills_dir.replace(/\/Users\/[^/]+/, "~") : t("settings.notInstalled")}
-                    </p>
-                  </div>
+                {agent.installed ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                ) : (
+                  <Circle className="w-3.5 h-3.5 text-zinc-700 shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <h3 className={cn("text-[11px] font-medium truncate", agent.installed ? "text-zinc-300" : "text-zinc-600")}>
+                    {agent.display_name}
+                  </h3>
+                  <p className="text-[9px] text-zinc-700 truncate" title={agent.skills_dir}>
+                    {agent.installed ? agent.skills_dir.replace(/\/Users\/[^/]+/, "~") : t("settings.notInstalled")}
+                  </p>
                 </div>
               </div>
             ))}
           </div>
         </section>
 
+        {/* Global config */}
         <section>
-          <h2 className="text-lg font-semibold text-zinc-200 mb-4">{t("settings.globalConfig")}</h2>
-          <div className="bg-[#121212] border border-[#2A2A2A] rounded-lg overflow-hidden divide-y divide-[#1C1C1C]">
-            <div className="px-4 py-3.5 flex items-start justify-between">
-              <div>
-                <h3 className="text-zinc-200 text-sm font-medium mb-1">{t("settings.repoPath")}</h3>
-                <p className="text-zinc-500 text-xs mb-2">{t("settings.repoPathDesc")}</p>
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 bg-[#0A0A0A] border border-[#2A2A2A] rounded-md px-2.5 py-1">
-                    <Folder className="w-3.5 h-3.5 text-zinc-500" />
-                    <span className="text-xs font-mono text-zinc-300">~/.skills-manager/</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleOpenRepoInFinder}
-                    disabled={openingRepo}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-all outline-none",
-                      "border-indigo-500/25 bg-indigo-500/10 text-indigo-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
-                      "hover:border-indigo-400/40 hover:bg-indigo-500/15 hover:text-indigo-200",
-                      "focus-visible:border-indigo-400/50 focus-visible:ring-2 focus-visible:ring-indigo-500/20",
-                      openingRepo && "cursor-wait opacity-70"
-                    )}
-                  >
-                    {openingRepo ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    )}
-                    {t("settings.openInFinder")}
-                  </button>
+          <h2 className="text-[11px] font-semibold text-zinc-600 uppercase tracking-[0.08em] mb-3">
+            {t("settings.globalConfig")}
+          </h2>
+          <div className="bg-[#131318] border border-[#1C1C24] rounded-lg overflow-hidden divide-y divide-[#1C1C24]">
+            {/* Repo path */}
+            <div className="px-4 py-3 flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <h3 className="text-[12px] text-zinc-200 font-medium mb-0.5">{t("settings.repoPath")}</h3>
+                <p className="text-[11px] text-zinc-600">{t("settings.repoPathDesc")}</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1.5 bg-[#0C0C10] border border-[#1C1C24] rounded-[4px] px-2 py-1">
+                  <Folder className="w-3 h-3 text-zinc-600" />
+                  <span className="text-[11px] font-mono text-zinc-400">~/.skills-manager/</span>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleOpenRepoInFinder}
+                  disabled={openingRepo}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-[4px] border px-2.5 py-1 text-[11px] font-medium transition-all outline-none",
+                    "border-indigo-500/25 bg-indigo-500/8 text-indigo-400",
+                    "hover:border-indigo-400/40 hover:bg-indigo-500/12",
+                    openingRepo && "cursor-wait opacity-70"
+                  )}
+                >
+                  {openingRepo ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <ExternalLink className="w-3 h-3" />
+                  )}
+                  {t("settings.openInFinder")}
+                </button>
               </div>
             </div>
 
-            <div className="px-4 py-3.5 flex items-center justify-between">
+            {/* Sync mode */}
+            <div className="px-4 py-3 flex items-center justify-between gap-4">
               <div>
-                <h3 className="text-zinc-200 text-sm font-medium mb-1">{t("settings.syncMode")}</h3>
-                <p className="text-zinc-500 text-xs">{t("settings.syncModeDesc")}</p>
+                <h3 className="text-[12px] text-zinc-200 font-medium mb-0.5">{t("settings.syncMode")}</h3>
+                <p className="text-[11px] text-zinc-600">{t("settings.syncModeDesc")}</p>
               </div>
-              <div className="flex bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg p-1">
+              <div className="flex bg-[#0C0C10] border border-[#1C1C24] rounded-[4px] p-px shrink-0">
                 <button
                   onClick={() => handleSyncModeChange("symlink")}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                    syncMode === "symlink"
-                      ? "bg-[#252528] text-zinc-200 shadow-sm"
-                      : "text-zinc-500 hover:text-zinc-300"
+                    "flex items-center gap-1.5 px-2.5 py-1 rounded-[3px] text-[11px] font-medium transition-colors outline-none",
+                    syncMode === "symlink" ? "bg-[#1E1E2A] text-zinc-200" : "text-zinc-600 hover:text-zinc-400"
                   )}
                 >
-                  <LinkIcon className="w-3.5 h-3.5" /> {t("settings.symlink")}
+                  <LinkIcon className="w-3 h-3" /> {t("settings.symlink")}
                 </button>
                 <button
                   onClick={() => handleSyncModeChange("copy")}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                    syncMode === "copy"
-                      ? "bg-[#252528] text-zinc-200 shadow-sm"
-                      : "text-zinc-500 hover:text-zinc-300"
+                    "flex items-center gap-1.5 px-2.5 py-1 rounded-[3px] text-[11px] font-medium transition-colors outline-none",
+                    syncMode === "copy" ? "bg-[#1E1E2A] text-zinc-200" : "text-zinc-600 hover:text-zinc-400"
                   )}
                 >
-                  <Copy className="w-3.5 h-3.5" /> {t("settings.copy")}
+                  <Copy className="w-3 h-3" /> {t("settings.copy")}
                 </button>
               </div>
             </div>
 
-            <div className="px-4 py-3.5 flex items-center justify-between">
+            {/* Current scenario */}
+            <div className="px-4 py-3 flex items-center justify-between gap-4">
               <div>
-                <h3 className="text-zinc-200 text-sm font-medium mb-1">{t("settings.currentScenario")}</h3>
-                <p className="text-zinc-500 text-xs">{t("settings.currentScenarioDesc")}</p>
+                <h3 className="text-[12px] text-zinc-200 font-medium mb-0.5">{t("settings.currentScenario")}</h3>
+                <p className="text-[11px] text-zinc-600">{t("settings.currentScenarioDesc")}</p>
               </div>
               <select
                 value={activeScenario?.id || ""}
                 onChange={(e) => handleActiveScenarioChange(e.target.value)}
-                className="bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500/50"
+                className={selectClass}
               >
-                <option value="" disabled>
-                  —
-                </option>
+                <option value="" disabled>—</option>
                 {scenarios.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
+                  <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
             </div>
 
-            <div className="px-4 py-3.5 flex items-center justify-between">
+            {/* Default scenario */}
+            <div className="px-4 py-3 flex items-center justify-between gap-4">
               <div>
-                <h3 className="text-zinc-200 text-sm font-medium mb-1">{t("settings.defaultScenario")}</h3>
-                <p className="text-zinc-500 text-xs">{t("settings.defaultScenarioDesc")}</p>
+                <h3 className="text-[12px] text-zinc-200 font-medium mb-0.5">{t("settings.defaultScenario")}</h3>
+                <p className="text-[11px] text-zinc-600">{t("settings.defaultScenarioDesc")}</p>
               </div>
               <select
                 value={defaultScenario}
                 onChange={(e) => handleDefaultScenarioChange(e.target.value)}
-                className="bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500/50"
+                className={selectClass}
               >
                 <option value="">—</option>
                 {scenarios.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
+                  <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
             </div>
 
-            <div className="px-4 py-3.5 flex items-center justify-between">
+            {/* Language */}
+            <div className="px-4 py-3 flex items-center justify-between gap-4">
               <div>
-                <h3 className="text-zinc-200 text-sm font-medium mb-1">{t("settings.language")}</h3>
+                <h3 className="text-[12px] text-zinc-200 font-medium">{t("settings.language")}</h3>
               </div>
               <div className="flex items-center gap-2">
-                <Globe className="w-4 h-4 text-zinc-500" />
+                <Globe className="w-3.5 h-3.5 text-zinc-600" />
                 <select
                   value={i18n.language}
                   onChange={(e) => handleLanguageChange(e.target.value)}
-                  className="bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500/50"
+                  className={selectClass}
                 >
                   <option value="zh">简体中文 (zh-CN)</option>
                   <option value="en">English (en-US)</option>
@@ -265,23 +255,24 @@ export function Settings() {
           </div>
         </section>
 
+        {/* About */}
         <section>
-          <div className="bg-[#121212] border border-[#2A2A2A] rounded-lg p-5 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-lg bg-[#1C1C1C] border border-[#2A2A2A] flex items-center justify-center">
-                <Settings2 className="w-5 h-5 text-indigo-400" />
+          <div className="bg-[#131318] border border-[#1C1C24] rounded-lg p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-[#1C1C24] border border-[#22222C] flex items-center justify-center">
+                <Settings2 className="w-4 h-4 text-indigo-400" />
               </div>
               <div>
-                <h3 className="text-base font-semibold text-white">{t("settings.version")}</h3>
-                <p className="text-zinc-500 text-xs">{t("settings.tagline")}</p>
+                <h3 className="text-[13px] font-semibold text-zinc-100">{t("settings.version")}</h3>
+                <p className="text-zinc-600 text-[11px]">{t("settings.tagline")}</p>
               </div>
             </div>
-            <div className="flex gap-3">
-              <button className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#1C1C1C] hover:bg-[#252528] text-zinc-300 text-xs font-medium transition-colors border border-[#2A2A2A]">
-                <Github className="w-3.5 h-3.5" /> GitHub
+            <div className="flex gap-2">
+              <button className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[4px] bg-[#1C1C24] hover:bg-[#1E1E2A] text-zinc-400 text-[11px] font-medium transition-colors border border-[#22222C] outline-none">
+                <Github className="w-3 h-3" /> GitHub
               </button>
-              <button className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#1C1C1C] hover:bg-[#252528] text-zinc-300 text-xs font-medium transition-colors border border-[#2A2A2A]">
-                <MessageSquare className="w-3.5 h-3.5" /> Feedback
+              <button className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[4px] bg-[#1C1C24] hover:bg-[#1E1E2A] text-zinc-400 text-[11px] font-medium transition-colors border border-[#22222C] outline-none">
+                <MessageSquare className="w-3 h-3" /> Feedback
               </button>
             </div>
           </div>
