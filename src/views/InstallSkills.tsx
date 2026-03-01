@@ -26,7 +26,7 @@ import { useSearchParams } from "react-router-dom";
 
 export function InstallSkills() {
   const { t } = useTranslation();
-  const { refreshScenarios } = useApp();
+  const { refreshScenarios, refreshManagedSkills } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<"market" | "local" | "git">("market");
   const [marketTab, setMarketTab] = useState<"hot" | "trending" | "alltime">("hot");
@@ -92,7 +92,7 @@ export function InstallSkills() {
     try {
       await api.installFromSkillssh(skill.source, skill.skill_id);
       toast.success(`${skill.name} ${t("common.success")}`);
-      refreshScenarios();
+      await Promise.all([refreshScenarios(), refreshManagedSkills()]);
     } catch (e: any) {
       toast.error(e.toString());
     } finally {
@@ -110,7 +110,7 @@ export function InstallSkills() {
       if (!selected) return;
       await api.installLocal(selected as string);
       toast.success(t("common.success"));
-      await refreshScenarios();
+      await Promise.all([refreshScenarios(), refreshManagedSkills()]);
       await runScan();
     } catch (e: any) {
       toast.error(e.toString());
@@ -125,7 +125,7 @@ export function InstallSkills() {
       toast.success(t("common.success"));
       setGitUrl("");
       setGitName("");
-      refreshScenarios();
+      await Promise.all([refreshScenarios(), refreshManagedSkills()]);
     } catch (e: any) {
       toast.error(e.toString());
     } finally {
@@ -150,7 +150,7 @@ export function InstallSkills() {
     try {
       await api.importExistingSkill(sourcePath, name);
       toast.success(t("install.scan.importedOne", { name }));
-      await refreshScenarios();
+      await Promise.all([refreshScenarios(), refreshManagedSkills()]);
       await runScan();
     } catch (e: any) {
       toast.error(e.toString());
@@ -168,7 +168,7 @@ export function InstallSkills() {
     try {
       await api.importAllDiscovered();
       toast.success(t("install.scan.importedAll"));
-      await refreshScenarios();
+      await Promise.all([refreshScenarios(), refreshManagedSkills()]);
       await runScan();
     } catch (e: any) {
       toast.error(e.toString());
@@ -247,7 +247,7 @@ export function InstallSkills() {
               {marketSkills.map((skill) => (
                 <div
                   key={skill.id}
-                  className="bg-[#121212] border border-[#2A2A2A] rounded-xl p-5 hover:border-[#3A3A3A] transition-colors group flex flex-col h-[200px]"
+                  className="bg-[#121212] border border-[#2A2A2A] rounded-lg p-4 hover:border-[#3A3A3A] transition-colors group flex flex-col"
                 >
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-semibold text-zinc-200 text-base">{skill.name || skill.skill_id}</h3>
@@ -264,16 +264,16 @@ export function InstallSkills() {
                     </span>
                   </div>
                   <p className="text-sm text-zinc-500 line-clamp-2 mb-auto">{skill.skill_id}</p>
-                  <div className="pt-4 flex justify-end">
+                  <div className="pt-3 flex justify-end">
                     <button
                       onClick={() => handleInstallSkillssh(skill)}
                       disabled={installing === skill.id}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors shadow-sm w-full justify-center group-hover:shadow-[0_0_15px_rgba(79,70,229,0.2)] disabled:opacity-50"
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition-colors shadow-sm w-full justify-center disabled:opacity-50"
                     >
                       {installing === skill.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       ) : (
-                        <Plus className="w-4 h-4" />
+                        <Plus className="w-3.5 h-3.5" />
                       )}
                       {installing === skill.id ? t("install.installing") : t("install.oneClickInstall")}
                     </button>
@@ -289,14 +289,14 @@ export function InstallSkills() {
         <div className="flex-1 animate-in fade-in duration-300 space-y-8 pb-12">
           <div
             onClick={handleLocalInstall}
-            className="w-full bg-[#121212] border-2 border-dashed border-[#2A2A2A] rounded-2xl p-16 flex flex-col items-center justify-center text-center hover:bg-[#151515] hover:border-indigo-500/50 transition-colors cursor-pointer group"
+            className="w-full bg-[#121212] border border-dashed border-[#2A2A2A] rounded-xl p-8 flex flex-col items-center justify-center text-center hover:bg-[#151515] hover:border-indigo-500/50 transition-colors cursor-pointer group"
           >
-            <div className="w-16 h-16 bg-[#1C1C1C] rounded-full flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-indigo-500/10 transition-all">
-              <FolderUp className="w-8 h-8 text-zinc-500 group-hover:text-indigo-400" />
+            <div className="w-12 h-12 bg-[#1C1C1C] rounded-full flex items-center justify-center mb-4 group-hover:bg-indigo-500/10 transition-colors">
+              <FolderUp className="w-6 h-6 text-zinc-500 group-hover:text-indigo-400" />
             </div>
-            <h3 className="text-xl font-semibold text-zinc-200 mb-2">{t("install.dragDrop")}</h3>
-            <p className="text-zinc-500 mb-8 max-w-sm">{t("install.dragDropDesc")}</p>
-            <button className="px-6 py-2.5 rounded-lg bg-[#252528] hover:bg-[#2A2A2E] border border-[#3A3A3A] text-zinc-200 text-sm font-medium transition-colors">
+            <h3 className="text-base font-semibold text-zinc-200 mb-1">{t("install.dragDrop")}</h3>
+            <p className="text-zinc-500 text-sm mb-4 max-w-sm">{t("install.dragDropDesc")}</p>
+            <button className="px-4 py-1.5 rounded-md bg-[#252528] hover:bg-[#2A2A2E] border border-[#3A3A3A] text-zinc-200 text-xs font-medium transition-colors">
               {t("install.selectLocal")}
             </button>
           </div>
@@ -308,9 +308,9 @@ export function InstallSkills() {
                 <p className="text-sm text-zinc-500 mt-1">
                   {scanResult
                     ? t("install.scan.summary", {
-                        tools: scanResult.tools_scanned,
-                        skills: scanResult.skills_found,
-                      })
+                      tools: scanResult.tools_scanned,
+                      skills: scanResult.skills_found,
+                    })
                     : t("install.scan.initial")}
                 </p>
               </div>

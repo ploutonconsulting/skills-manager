@@ -11,6 +11,7 @@ import {
   Github,
   MessageSquare,
   Loader2,
+  ExternalLink,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -24,6 +25,7 @@ export function Settings() {
   const [syncMode, setSyncMode] = useState("symlink");
   const [defaultScenario, setDefaultScenario] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [openingRepo, setOpeningRepo] = useState(false);
 
   useEffect(() => {
     api.getSettings("sync_mode").then((v) => {
@@ -62,6 +64,18 @@ export function Settings() {
     api.setSettings("language", lng);
   };
 
+  const handleOpenRepoInFinder = async () => {
+    try {
+      setOpeningRepo(true);
+      await api.openCentralRepoInFinder();
+    } catch (error) {
+      console.error("Failed to open central repository in Finder", error);
+      toast.error(t("common.error"));
+    } finally {
+      setOpeningRepo(false);
+    }
+  };
+
   return (
     <div className="max-w-[1000px] mx-auto h-full flex flex-col animate-in fade-in duration-500 pb-12">
       <div className="mb-8 border-b border-[#1C1C1C] pb-6">
@@ -95,7 +109,7 @@ export function Settings() {
               <div
                 key={i}
                 className={cn(
-                  "flex items-center justify-between p-4 rounded-xl border transition-colors",
+                  "flex items-center justify-between p-3 rounded-lg border transition-colors",
                   agent.installed
                     ? "bg-[#121212] border-[#2A2A2A] hover:border-[#3A3A3A]"
                     : "bg-[#0A0A0A] border-[#1C1C1C] opacity-60 grayscale"
@@ -128,53 +142,74 @@ export function Settings() {
 
         <section>
           <h2 className="text-lg font-semibold text-zinc-200 mb-4">{t("settings.globalConfig")}</h2>
-          <div className="bg-[#121212] border border-[#2A2A2A] rounded-xl overflow-hidden divide-y divide-[#1C1C1C]">
-            <div className="p-5 flex items-start justify-between">
+          <div className="bg-[#121212] border border-[#2A2A2A] rounded-lg overflow-hidden divide-y divide-[#1C1C1C]">
+            <div className="px-4 py-3.5 flex items-start justify-between">
               <div>
-                <h3 className="text-zinc-200 font-medium mb-1">{t("settings.repoPath")}</h3>
-                <p className="text-zinc-500 text-sm mb-3">{t("settings.repoPathDesc")}</p>
-                <div className="flex items-center gap-2 bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-3 py-1.5 w-fit">
-                  <Folder className="w-4 h-4 text-zinc-500" />
-                  <span className="text-sm font-mono text-zinc-300">~/.skills-manager/</span>
+                <h3 className="text-zinc-200 text-sm font-medium mb-1">{t("settings.repoPath")}</h3>
+                <p className="text-zinc-500 text-xs mb-2">{t("settings.repoPathDesc")}</p>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-[#0A0A0A] border border-[#2A2A2A] rounded-md px-2.5 py-1">
+                    <Folder className="w-3.5 h-3.5 text-zinc-500" />
+                    <span className="text-xs font-mono text-zinc-300">~/.skills-manager/</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleOpenRepoInFinder}
+                    disabled={openingRepo}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-all outline-none",
+                      "border-indigo-500/25 bg-indigo-500/10 text-indigo-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
+                      "hover:border-indigo-400/40 hover:bg-indigo-500/15 hover:text-indigo-200",
+                      "focus-visible:border-indigo-400/50 focus-visible:ring-2 focus-visible:ring-indigo-500/20",
+                      openingRepo && "cursor-wait opacity-70"
+                    )}
+                  >
+                    {openingRepo ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    )}
+                    {t("settings.openInFinder")}
+                  </button>
                 </div>
               </div>
             </div>
 
-            <div className="p-5 flex items-center justify-between">
+            <div className="px-4 py-3.5 flex items-center justify-between">
               <div>
-                <h3 className="text-zinc-200 font-medium mb-1">{t("settings.syncMode")}</h3>
-                <p className="text-zinc-500 text-sm">{t("settings.syncModeDesc")}</p>
+                <h3 className="text-zinc-200 text-sm font-medium mb-1">{t("settings.syncMode")}</h3>
+                <p className="text-zinc-500 text-xs">{t("settings.syncModeDesc")}</p>
               </div>
               <div className="flex bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg p-1">
                 <button
                   onClick={() => handleSyncModeChange("symlink")}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
                     syncMode === "symlink"
                       ? "bg-[#252528] text-zinc-200 shadow-sm"
                       : "text-zinc-500 hover:text-zinc-300"
                   )}
                 >
-                  <LinkIcon className="w-4 h-4" /> {t("settings.symlink")}
+                  <LinkIcon className="w-3.5 h-3.5" /> {t("settings.symlink")}
                 </button>
                 <button
                   onClick={() => handleSyncModeChange("copy")}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
                     syncMode === "copy"
                       ? "bg-[#252528] text-zinc-200 shadow-sm"
                       : "text-zinc-500 hover:text-zinc-300"
                   )}
                 >
-                  <Copy className="w-4 h-4" /> {t("settings.copy")}
+                  <Copy className="w-3.5 h-3.5" /> {t("settings.copy")}
                 </button>
               </div>
             </div>
 
-            <div className="p-5 flex items-center justify-between">
+            <div className="px-4 py-3.5 flex items-center justify-between">
               <div>
-                <h3 className="text-zinc-200 font-medium mb-1">{t("settings.currentScenario")}</h3>
-                <p className="text-zinc-500 text-sm">{t("settings.currentScenarioDesc")}</p>
+                <h3 className="text-zinc-200 text-sm font-medium mb-1">{t("settings.currentScenario")}</h3>
+                <p className="text-zinc-500 text-xs">{t("settings.currentScenarioDesc")}</p>
               </div>
               <select
                 value={activeScenario?.id || ""}
@@ -192,10 +227,10 @@ export function Settings() {
               </select>
             </div>
 
-            <div className="p-5 flex items-center justify-between">
+            <div className="px-4 py-3.5 flex items-center justify-between">
               <div>
-                <h3 className="text-zinc-200 font-medium mb-1">{t("settings.defaultScenario")}</h3>
-                <p className="text-zinc-500 text-sm">{t("settings.defaultScenarioDesc")}</p>
+                <h3 className="text-zinc-200 text-sm font-medium mb-1">{t("settings.defaultScenario")}</h3>
+                <p className="text-zinc-500 text-xs">{t("settings.defaultScenarioDesc")}</p>
               </div>
               <select
                 value={defaultScenario}
@@ -211,9 +246,9 @@ export function Settings() {
               </select>
             </div>
 
-            <div className="p-5 flex items-center justify-between">
+            <div className="px-4 py-3.5 flex items-center justify-between">
               <div>
-                <h3 className="text-zinc-200 font-medium mb-1">{t("settings.language")}</h3>
+                <h3 className="text-zinc-200 text-sm font-medium mb-1">{t("settings.language")}</h3>
               </div>
               <div className="flex items-center gap-2">
                 <Globe className="w-4 h-4 text-zinc-500" />
@@ -231,18 +266,22 @@ export function Settings() {
         </section>
 
         <section>
-          <div className="bg-[#121212] border border-[#2A2A2A] rounded-xl p-6 flex flex-col items-center justify-center text-center">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 mb-4">
-              <Settings2 className="w-6 h-6 text-white" />
+          <div className="bg-[#121212] border border-[#2A2A2A] rounded-lg p-5 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-[#1C1C1C] border border-[#2A2A2A] flex items-center justify-center">
+                <Settings2 className="w-5 h-5 text-indigo-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-white">{t("settings.version")}</h3>
+                <p className="text-zinc-500 text-xs">{t("settings.tagline")}</p>
+              </div>
             </div>
-            <h3 className="text-lg font-bold text-white mb-1">{t("settings.version")}</h3>
-            <p className="text-zinc-500 text-sm mb-6">{t("settings.tagline")}</p>
-            <div className="flex gap-4">
-              <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1C1C1C] hover:bg-[#252528] text-zinc-300 text-sm font-medium transition-colors border border-[#2A2A2A]">
-                <Github className="w-4 h-4" /> GitHub
+            <div className="flex gap-3">
+              <button className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#1C1C1C] hover:bg-[#252528] text-zinc-300 text-xs font-medium transition-colors border border-[#2A2A2A]">
+                <Github className="w-3.5 h-3.5" /> GitHub
               </button>
-              <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1C1C1C] hover:bg-[#252528] text-zinc-300 text-sm font-medium transition-colors border border-[#2A2A2A]">
-                <MessageSquare className="w-4 h-4" /> Feedback
+              <button className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#1C1C1C] hover:bg-[#252528] text-zinc-300 text-xs font-medium transition-colors border border-[#2A2A2A]">
+                <MessageSquare className="w-3.5 h-3.5" /> Feedback
               </button>
             </div>
           </div>

@@ -13,6 +13,7 @@ pub struct ScenarioDto {
     pub id: String,
     pub name: String,
     pub description: Option<String>,
+    pub icon: Option<String>,
     pub sort_order: i32,
     pub skill_count: i64,
     pub created_at: i64,
@@ -31,6 +32,7 @@ pub fn get_scenarios(store: State<'_, Arc<SkillStore>>) -> Result<Vec<ScenarioDt
             id: s.id,
             name: s.name,
             description: s.description,
+            icon: s.icon,
             sort_order: s.sort_order,
             skill_count: count,
             created_at: s.created_at,
@@ -54,6 +56,7 @@ pub fn get_active_scenario(store: State<'_, Arc<SkillStore>>) -> Result<Option<S
                 id: s.id,
                 name: s.name,
                 description: s.description,
+                icon: s.icon,
                 sort_order: s.sort_order,
                 skill_count: count,
                 created_at: s.created_at,
@@ -68,6 +71,7 @@ pub fn get_active_scenario(store: State<'_, Arc<SkillStore>>) -> Result<Option<S
 pub fn create_scenario(
     name: String,
     description: Option<String>,
+    icon: Option<String>,
     store: State<'_, Arc<SkillStore>>,
 ) -> Result<ScenarioDto, String> {
     let now = chrono::Utc::now().timestamp_millis();
@@ -77,6 +81,7 @@ pub fn create_scenario(
         id: id.clone(),
         name: name.clone(),
         description: description.clone(),
+        icon: icon.clone(),
         sort_order: 999,
         created_at: now,
         updated_at: now,
@@ -95,6 +100,7 @@ pub fn create_scenario(
         id,
         name,
         description,
+        icon,
         sort_order: 999,
         skill_count: 0,
         created_at: now,
@@ -107,10 +113,11 @@ pub fn update_scenario(
     id: String,
     name: String,
     description: Option<String>,
+    icon: Option<String>,
     store: State<'_, Arc<SkillStore>>,
 ) -> Result<(), String> {
     store
-        .update_scenario(&id, &name, description.as_deref())
+        .update_scenario(&id, &name, description.as_deref(), icon.as_deref())
         .map_err(|e| e.to_string())
 }
 

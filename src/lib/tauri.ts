@@ -45,6 +45,7 @@ export interface Scenario {
   id: string;
   name: string;
   description: string | null;
+  icon: string | null;
   sort_order: number;
   skill_count: number;
   created_at: number;
@@ -135,6 +136,9 @@ export const getSettings = (key: string) =>
 export const setSettings = (key: string, value: string) =>
   invoke<void>("set_settings", { key, value });
 
+export const openCentralRepoInFinder = () =>
+  invoke<void>("open_central_repo_in_finder");
+
 // ── Scenarios ──
 
 export const getScenarios = () => invoke<Scenario[]>("get_scenarios");
@@ -142,17 +146,25 @@ export const getScenarios = () => invoke<Scenario[]>("get_scenarios");
 export const getActiveScenario = () =>
   invoke<Scenario | null>("get_active_scenario");
 
-export const createScenario = (name: string, description?: string) =>
+export const createScenario = (name: string, description?: string, icon?: string) =>
   invoke<Scenario>("create_scenario", {
     name,
     description: description || null,
+    icon: icon || null,
   });
 
 export const updateScenario = (
   id: string,
   name: string,
-  description?: string
-) => invoke<void>("update_scenario", { id, name, description: description || null });
+  description?: string,
+  icon?: string
+) =>
+  invoke<void>("update_scenario", {
+    id,
+    name,
+    description: description || null,
+    icon: icon || null,
+  });
 
 export const deleteScenario = (id: string) =>
   invoke<void>("delete_scenario", { id });

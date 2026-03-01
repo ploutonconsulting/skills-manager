@@ -1,14 +1,16 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
-import type { Scenario, ToolInfo } from "../lib/tauri";
+import type { ManagedSkill, Scenario, ToolInfo } from "../lib/tauri";
 import * as api from "../lib/tauri";
 
 interface AppState {
   scenarios: Scenario[];
   activeScenario: Scenario | null;
   tools: ToolInfo[];
+  managedSkills: ManagedSkill[];
   loading: boolean;
   refreshScenarios: () => Promise<void>;
   refreshTools: () => Promise<void>;
+  refreshManagedSkills: () => Promise<void>;
   switchScenario: (id: string) => Promise<void>;
 }
 
@@ -18,6 +20,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [activeScenario, setActiveScenario] = useState<Scenario | null>(null);
   const [tools, setTools] = useState<ToolInfo[]>([]);
+  const [managedSkills, setManagedSkills] = useState<ManagedSkill[]>([]);
   const [loading, setLoading] = useState(true);
 
   const refreshScenarios = useCallback(async () => {
@@ -42,6 +45,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshManagedSkills = useCallback(async () => {
+    try {
+      const skills = await api.getManagedSkills();
+      setManagedSkills(skills);
+    } catch (e) {
+      console.error("Failed to load managed skills:", e);
+    }
+  }, []);
+
   const handleSwitchScenario = useCallback(
     async (id: string) => {
       try {
@@ -57,11 +69,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function init() {
       setLoading(true);
-      await Promise.all([refreshScenarios(), refreshTools()]);
+      await Promise.all([refreshScenarios(), refreshTools(), refreshManagedSkills()]);
       setLoading(false);
     }
     init();
-  }, [refreshScenarios, refreshTools]);
+  }, [refreshManagedSkills, refreshScenarios, refreshTools]);
 
   return (
     <AppContext.Provider
@@ -69,9 +81,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         scenarios,
         activeScenario,
         tools,
+        managedSkills,
         loading,
         refreshScenarios,
         refreshTools,
+        refreshManagedSkills,
         switchScenario: handleSwitchScenario,
       }}
     >

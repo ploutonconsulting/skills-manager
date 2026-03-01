@@ -53,6 +53,7 @@ pub fn run() {
             // Settings
             commands::settings::get_settings,
             commands::settings::set_settings,
+            commands::settings::open_central_repo_in_finder,
             // Scenarios
             commands::scenarios::get_scenarios,
             commands::scenarios::get_active_scenario,

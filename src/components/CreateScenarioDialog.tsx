@@ -1,17 +1,20 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { cn } from "../utils";
+import { SCENARIO_ICON_OPTIONS } from "../lib/scenarioIcons";
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  onCreate: (name: string, description?: string) => Promise<void>;
+  onCreate: (name: string, description?: string, icon?: string) => Promise<void>;
 }
 
 export function CreateScenarioDialog({ open, onClose, onCreate }: Props) {
   const { t } = useTranslation();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [icon, setIcon] = useState(SCENARIO_ICON_OPTIONS[0].key);
   const [loading, setLoading] = useState(false);
 
   if (!open) return null;
@@ -20,9 +23,10 @@ export function CreateScenarioDialog({ open, onClose, onCreate }: Props) {
     if (!name.trim()) return;
     setLoading(true);
     try {
-      await onCreate(name.trim(), description.trim() || undefined);
+      await onCreate(name.trim(), description.trim() || undefined, icon);
       setName("");
       setDescription("");
+      setIcon(SCENARIO_ICON_OPTIONS[0].key);
       onClose();
     } finally {
       setLoading(false);
@@ -62,6 +66,31 @@ export function CreateScenarioDialog({ open, onClose, onCreate }: Props) {
               placeholder={t("scenario.descPlaceholder")}
               className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all placeholder-zinc-600"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-zinc-400 mb-2">{t("scenario.icon")}</label>
+            <div className="grid grid-cols-5 gap-2">
+              {SCENARIO_ICON_OPTIONS.map((option) => {
+                const Icon = option.icon;
+                const selected = option.key === icon;
+                return (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => setIcon(option.key)}
+                    className={cn(
+                      "flex h-11 items-center justify-center rounded-xl border bg-[#0A0A0A] transition-all",
+                      selected
+                        ? `${option.activeClass} ${option.colorClass}`
+                        : "border-[#2A2A2A] text-zinc-500 hover:border-[#3A3A3A] hover:text-zinc-200"
+                    )}
+                    title={option.label}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button

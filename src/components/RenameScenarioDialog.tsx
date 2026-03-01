@@ -1,30 +1,45 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { cn } from "../utils";
+import { SCENARIO_ICON_OPTIONS } from "../lib/scenarioIcons";
 
 interface Props {
   open: boolean;
   currentName: string;
+  currentIcon?: string | null;
   onClose: () => void;
-  onRename: (newName: string) => Promise<void>;
+  onRename: (newName: string, icon?: string) => Promise<void>;
 }
 
-export function RenameScenarioDialog({ open, currentName, onClose, onRename }: Props) {
+export function RenameScenarioDialog({
+  open,
+  currentName,
+  currentIcon,
+  onClose,
+  onRename,
+}: Props) {
   const { t } = useTranslation();
   const [name, setName] = useState(currentName);
+  const [icon, setIcon] = useState(currentIcon || SCENARIO_ICON_OPTIONS[0].key);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (open) setName(currentName);
-  }, [open, currentName]);
+    if (open) {
+      setName(currentName);
+      setIcon(currentIcon || SCENARIO_ICON_OPTIONS[0].key);
+    }
+  }, [open, currentIcon, currentName]);
 
   if (!open) return null;
 
   const handleRename = async () => {
-    if (!name.trim() || name.trim() === currentName) return;
+    if (!name.trim() || (name.trim() === currentName && icon === (currentIcon || SCENARIO_ICON_OPTIONS[0].key))) {
+      return;
+    }
     setLoading(true);
     try {
-      await onRename(name.trim());
+      await onRename(name.trim(), icon);
       onClose();
     } finally {
       setLoading(false);
@@ -55,6 +70,31 @@ export function RenameScenarioDialog({ open, currentName, onClose, onRename }: P
               onKeyDown={(e) => e.key === "Enter" && handleRename()}
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-zinc-400 mb-2">{t("scenario.icon")}</label>
+            <div className="grid grid-cols-5 gap-2">
+              {SCENARIO_ICON_OPTIONS.map((option) => {
+                const Icon = option.icon;
+                const selected = option.key === icon;
+                return (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => setIcon(option.key)}
+                    className={cn(
+                      "flex h-11 items-center justify-center rounded-xl border bg-[#0A0A0A] transition-all",
+                      selected
+                        ? `${option.activeClass} ${option.colorClass}`
+                        : "border-[#2A2A2A] text-zinc-500 hover:border-[#3A3A3A] hover:text-zinc-200"
+                    )}
+                    title={option.label}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div className="flex justify-end gap-3 pt-2">
             <button
               onClick={onClose}
@@ -64,7 +104,11 @@ export function RenameScenarioDialog({ open, currentName, onClose, onRename }: P
             </button>
             <button
               onClick={handleRename}
-              disabled={!name.trim() || name.trim() === currentName || loading}
+              disabled={
+                !name.trim() ||
+                (name.trim() === currentName && icon === (currentIcon || SCENARIO_ICON_OPTIONS[0].key)) ||
+                loading
+              }
               className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-indigo-500"
             >
               {loading ? t("common.loading") : t("common.save")}

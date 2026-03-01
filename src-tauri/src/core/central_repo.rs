@@ -1,14 +1,10 @@
 use anyhow::Result;
 use std::path::PathBuf;
 
-fn base_dir() -> PathBuf {
+pub fn base_dir() -> PathBuf {
     dirs::home_dir()
         .expect("Cannot determine home directory")
         .join(".skills-manager")
-}
-
-pub fn default_central_repo_path() -> PathBuf {
-    base_dir()
 }
 
 pub fn skills_dir() -> PathBuf {

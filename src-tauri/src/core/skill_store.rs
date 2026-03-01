@@ -52,6 +52,7 @@ pub struct ScenarioRecord {
     pub id: String,
     pub name: String,
     pub description: Option<String>,
+    pub icon: Option<String>,
     pub sort_order: i32,
     pub created_at: i64,
     pub updated_at: i64,
@@ -117,6 +118,7 @@ impl SkillStore {
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL UNIQUE,
                 description TEXT,
+                icon TEXT,
                 sort_order INTEGER DEFAULT 0,
                 created_at INTEGER,
                 updated_at INTEGER
@@ -135,6 +137,17 @@ impl SkillStore {
             );
             ",
         )?;
+
+        let has_icon_column = {
+            let mut stmt = conn.prepare("PRAGMA table_info(scenarios)")?;
+            let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
+            let exists = rows.filter_map(|row| row.ok()).any(|name| name == "icon");
+            exists
+        };
+
+        if !has_icon_column {
+            conn.execute("ALTER TABLE scenarios ADD COLUMN icon TEXT", [])?;
+        }
 
         Ok(Self {
             conn: Mutex::new(conn),
@@ -381,12 +394,13 @@ impl SkillStore {
     pub fn insert_scenario(&self, scenario: &ScenarioRecord) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO scenarios (id, name, description, sort_order, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO scenarios (id, name, description, icon, sort_order, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 scenario.id,
                 scenario.name,
                 scenario.description,
+                scenario.icon,
                 scenario.sort_order,
                 scenario.created_at,
                 scenario.updated_at,
@@ -398,27 +412,34 @@ impl SkillStore {
     pub fn get_all_scenarios(&self) -> Result<Vec<ScenarioRecord>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, name, description, sort_order, created_at, updated_at FROM scenarios ORDER BY sort_order, created_at",
+            "SELECT id, name, description, icon, sort_order, created_at, updated_at FROM scenarios ORDER BY sort_order, created_at",
         )?;
         let rows = stmt.query_map([], |row| {
             Ok(ScenarioRecord {
                 id: row.get(0)?,
                 name: row.get(1)?,
                 description: row.get(2)?,
-                sort_order: row.get(3)?,
-                created_at: row.get(4)?,
-                updated_at: row.get(5)?,
+                icon: row.get(3)?,
+                sort_order: row.get(4)?,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
             })
         })?;
         Ok(rows.filter_map(|r| r.ok()).collect())
     }
 
-    pub fn update_scenario(&self, id: &str, name: &str, description: Option<&str>) -> Result<()> {
+    pub fn update_scenario(
+        &self,
+        id: &str,
+        name: &str,
+        description: Option<&str>,
+        icon: Option<&str>,
+    ) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let now = chrono::Utc::now().timestamp_millis();
         conn.execute(
-            "UPDATE scenarios SET name = ?1, description = ?2, updated_at = ?3 WHERE id = ?4",
-            params![name, description, now, id],
+            "UPDATE scenarios SET name = ?1, description = ?2, icon = ?3, updated_at = ?4 WHERE id = ?5",
+            params![name, description, icon, now, id],
         )?;
         Ok(())
     }

@@ -10,6 +10,9 @@
     "newScenario": "New Scenario",
     "settings": "Settings"
   },
+  "topbar": {
+    "supportedSkills": "Supported Skills"
+  },
   "dashboard": {
     "greeting": "Hello!",
     "currentScenario": "Current Scenario",
@@ -38,11 +41,22 @@
     "inScenario": "Enabled in current scenario",
     "notInScenario": "Not enabled in current scenario",
     "remove": "Remove from scenario",
+    "delete": "Delete skill",
+    "deleteConfirm": "Delete skill \"{{name}}\" permanently? This removes its central library files, scenario links, and synced agent targets.",
+    "deleted": "deleted",
     "viewDoc": "View docs",
     "noSkills": "No skills to display",
     "addFirst": "Click \"Install Skills\" to add skills into the central library",
     "noMatch": "No skills match the current search or filter",
     "noScenario": "No scenario is currently available",
+    "currentScenarioFallback": "Current scenario",
+    "scenarioCount": "{{count}} scenarios",
+    "syncCoverage": "Sync coverage",
+    "sourceRef": "Source",
+    "localSource": "Local library",
+    "agentCount": "{{count}} agents",
+    "ready": "Ready",
+    "standby": "Standby",
     "filters": {
       "all": "All",
       "enabled": "Enabled",
@@ -96,6 +110,7 @@
     "repoPath": "Central Repository Path",
     "repoPathDesc": "Default storage location for all Skills and scenario configs.",
     "changeDir": "Change Directory",
+    "openInFinder": "Open in Finder",
     "syncMode": "Default Sync Mode",
     "syncModeDesc": "Symlinks are recommended — minimal disk usage with live updates.",
     "symlink": "Symlink",
@@ -124,6 +139,7 @@
     "create": "New Scenario",
     "name": "Scenario Name",
     "description": "Description (optional)",
+    "icon": "Scenario Icon",
     "namePlaceholder": "Enter scenario name...",
     "descPlaceholder": "Briefly describe this scenario...",
     "deleteConfirm": "Delete scenario \"{{name}}\"? Skills will remain in the central repo.",

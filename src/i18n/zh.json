@@ -10,6 +10,9 @@
     "newScenario": "新建场景",
     "settings": "设置"
   },
+  "topbar": {
+    "supportedSkills": "支持的 Skills"
+  },
   "dashboard": {
     "greeting": "你好！",
     "currentScenario": "当前场景",
@@ -38,11 +41,22 @@
     "inScenario": "当前场景已启用",
     "notInScenario": "当前场景未启用",
     "remove": "从当前场景移除",
+    "delete": "删除 Skill",
+    "deleteConfirm": "确定彻底删除 Skill \"{{name}}\" 吗？中央仓库文件、场景关联和已同步到各 Agent 的目标都会被移除。",
+    "deleted": "已删除",
     "viewDoc": "查看文档",
     "noSkills": "没有可显示的 Skills",
     "addFirst": "点击“安装 Skills”开始添加到中央仓库",
     "noMatch": "没有符合当前搜索或筛选条件的 Skills",
     "noScenario": "当前还没有可用场景",
+    "currentScenarioFallback": "当前场景",
+    "scenarioCount": "{{count}} 个场景",
+    "syncCoverage": "同步覆盖",
+    "sourceRef": "来源位置",
+    "localSource": "本地仓库",
+    "agentCount": "{{count}} 个 Agent",
+    "ready": "已就绪",
+    "standby": "待启用",
     "filters": {
       "all": "全部",
       "enabled": "当前场景已启用",
@@ -96,6 +110,7 @@
     "repoPath": "中央仓库路径",
     "repoPathDesc": "所有 Skills 和场景配置的默认存储位置。",
     "changeDir": "更改目录",
+    "openInFinder": "在 Finder 中打开",
     "syncMode": "默认同步模式",
     "syncModeDesc": "推荐使用符号链接，占用空间极小且修改可实时生效。",
     "symlink": "符号链接",
@@ -124,6 +139,7 @@
     "create": "新建场景",
     "name": "场景名称",
     "description": "描述 (可选)",
+    "icon": "场景图标",
     "namePlaceholder": "输入场景名称...",
     "descPlaceholder": "简短描述这个场景的用途...",
     "deleteConfirm": "确定删除场景 \"{{name}}\" 吗？Skills 仍会保留在中央仓库中。",

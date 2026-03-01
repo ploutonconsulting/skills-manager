@@ -10,7 +10,7 @@ export function Layout() {
                 <Topbar />
 
                 {/* Main Content Area */}
-                <div className="flex-1 overflow-y-auto scrollbar-hide relative z-0 p-8">
+                <div className="flex-1 overflow-y-auto scrollbar-hide relative z-0 p-5">
                     <Outlet />
                 </div>
             </div>

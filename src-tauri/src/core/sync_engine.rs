@@ -15,12 +15,6 @@ impl SyncMode {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
-        match s {
-            "copy" => SyncMode::Copy,
-            _ => SyncMode::Symlink,
-        }
-    }
 }
 
 pub fn sync_mode_for_tool(tool_key: &str) -> SyncMode {
