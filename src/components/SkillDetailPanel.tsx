@@ -1,13 +1,24 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, FileText, Folder } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
+import { cn } from "../utils";
 import { getSkillDocument, type ManagedSkill, type SkillDocument } from "../lib/tauri";
 
 interface Props {
   skill: ManagedSkill | null;
   onClose: () => void;
+}
+
+function stripFrontmatter(content: string) {
+  if (!content.startsWith("---\n")) return content;
+
+  const end = content.indexOf("\n---\n", 4);
+  if (end === -1) return content;
+
+  return content.slice(end + 5).trimStart();
 }
 
 export function SkillDetailPanel({ skill, onClose }: Props) {
@@ -27,14 +38,18 @@ export function SkillDetailPanel({ skill, onClose }: Props) {
       .finally(() => setLoading(false));
   }, [skill]);
 
+  const markdown = useMemo(() => {
+    if (!doc) return "";
+    return stripFrontmatter(doc.content);
+  }, [doc]);
+
   if (!skill) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex">
+  return createPortal(
+    <div className="fixed inset-y-0 right-0 left-[220px] z-50 flex">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative ml-auto w-full max-w-xl bg-bg-secondary border-l border-border-subtle h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-200">
-        {/* Header */}
-        <div className="flex items-start justify-between px-5 py-4 border-b border-border-subtle">
+      <div className="relative flex h-full min-h-0 w-full flex-col border-l border-border-subtle bg-bg-secondary shadow-2xl animate-in slide-in-from-right duration-200">
+        <div className="flex items-start justify-between border-b border-border-subtle px-5 py-4">
           <div className="min-w-0 mr-3">
             <h2 className="text-[14px] font-semibold text-primary truncate">{skill.name}</h2>
             {skill.description && (
@@ -49,8 +64,7 @@ export function SkillDetailPanel({ skill, onClose }: Props) {
           </button>
         </div>
 
-        {/* Meta */}
-        <div className="px-5 py-2.5 border-b border-border-subtle flex items-center gap-4 text-[11px] text-muted">
+        <div className="flex items-center gap-4 border-b border-border-subtle px-5 py-2.5 text-[11px] text-muted">
           <div className="flex items-center gap-1.5">
             <FileText className="w-3 h-3" />
             {doc?.filename || "—"}
@@ -61,14 +75,112 @@ export function SkillDetailPanel({ skill, onClose }: Props) {
           </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-hide">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 scrollbar-hide">
           {loading ? (
             <div className="text-[12px] text-muted text-center mt-12">{t("common.loading")}</div>
           ) : doc ? (
-            <article className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-secondary prose-p:text-tertiary prose-a:text-accent prose-code:text-accent-light prose-code:bg-surface-hover prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-background prose-pre:border prose-pre:border-border-subtle">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {doc.content}
+            <article className="mx-auto w-full max-w-[1240px] text-[13px] leading-6 text-secondary">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  h1: ({ className, ...props }) => (
+                    <h1
+                      className={cn("mb-4 text-[28px] font-semibold leading-tight text-primary", className)}
+                      {...props}
+                    />
+                  ),
+                  h2: ({ className, ...props }) => (
+                    <h2
+                      className={cn("mb-3 mt-8 text-[20px] font-semibold leading-tight text-primary", className)}
+                      {...props}
+                    />
+                  ),
+                  h3: ({ className, ...props }) => (
+                    <h3
+                      className={cn("mb-2 mt-6 text-[16px] font-semibold leading-tight text-primary", className)}
+                      {...props}
+                    />
+                  ),
+                  p: ({ className, ...props }) => (
+                    <p className={cn("mb-4 text-[13px] leading-6 text-secondary", className)} {...props} />
+                  ),
+                  a: ({ className, ...props }) => (
+                    <a
+                      className={cn("text-accent-light underline decoration-accent-border underline-offset-4", className)}
+                      target="_blank"
+                      rel="noreferrer"
+                      {...props}
+                    />
+                  ),
+                  ul: ({ className, ...props }) => (
+                    <ul className={cn("mb-4 list-disc space-y-1 pl-5 text-secondary", className)} {...props} />
+                  ),
+                  ol: ({ className, ...props }) => (
+                    <ol className={cn("mb-4 list-decimal space-y-1 pl-5 text-secondary", className)} {...props} />
+                  ),
+                  li: ({ className, ...props }) => (
+                    <li className={cn("pl-1 marker:text-muted", className)} {...props} />
+                  ),
+                  blockquote: ({ className, ...props }) => (
+                    <blockquote
+                      className={cn(
+                        "mb-4 border-l-2 border-accent-border bg-surface/70 px-4 py-2 text-tertiary italic",
+                        className
+                      )}
+                      {...props}
+                    />
+                  ),
+                  hr: ({ className, ...props }) => (
+                    <hr className={cn("my-6 border-border-subtle", className)} {...props} />
+                  ),
+                  code: ({ className, children, ...props }) => {
+                    const isBlock = String(className || "").includes("language-");
+                    if (isBlock) {
+                      return (
+                        <code className={cn("block text-[12px] leading-6 text-secondary", className)} {...props}>
+                          {children}
+                        </code>
+                      );
+                    }
+
+                    return (
+                      <code
+                        className={cn(
+                          "rounded bg-surface-hover px-1.5 py-0.5 font-mono text-[12px] text-accent-light",
+                          className
+                        )}
+                        {...props}
+                      >
+                        {children}
+                      </code>
+                    );
+                  },
+                  pre: ({ className, ...props }) => (
+                    <pre
+                      className={cn(
+                        "mb-4 overflow-x-auto rounded-xl border border-border-subtle bg-background px-4 py-3",
+                        className
+                      )}
+                      {...props}
+                    />
+                  ),
+                  table: ({ className, ...props }) => (
+                    <div className="mb-4 overflow-x-auto rounded-xl border border-border-subtle">
+                      <table className={cn("min-w-full border-collapse text-left text-[12px]", className)} {...props} />
+                    </div>
+                  ),
+                  thead: ({ className, ...props }) => (
+                    <thead className={cn("bg-surface-hover text-primary", className)} {...props} />
+                  ),
+                  th: ({ className, ...props }) => (
+                    <th className={cn("border-b border-border-subtle px-3 py-2 font-medium", className)} {...props} />
+                  ),
+                  td: ({ className, ...props }) => (
+                    <td className={cn("border-b border-border-subtle px-3 py-2 text-secondary", className)} {...props} />
+                  ),
+                }}
+              >
+                {markdown}
               </ReactMarkdown>
             </article>
           ) : (
@@ -76,6 +188,7 @@ export function SkillDetailPanel({ skill, onClose }: Props) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

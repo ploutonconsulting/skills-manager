@@ -422,23 +422,29 @@ export function InstallSkills() {
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-3">
-                    {paginatedMarketSkills.map((skill) => (
+                    {paginatedMarketSkills.map((skill) => {
+                      const displayName = skill.name || skill.skill_id;
+                      const showSkillId = skill.skill_id.trim() !== displayName.trim();
+
+                      return (
                       <div
                         key={skill.id}
-                        className="flex flex-col gap-2.5 rounded-lg border border-border-subtle bg-surface p-3 transition-colors hover:border-border"
+                        className="flex flex-col gap-2 rounded-lg border border-border-subtle bg-surface p-2.5 transition-colors hover:border-border"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
                             <h3 className="truncate text-[13px] font-semibold text-secondary">
-                              {skill.name || skill.skill_id}
+                              {displayName}
                             </h3>
-                            <p className="mt-0.5 truncate text-[10px] text-faint">{skill.skill_id}</p>
+                            {showSkillId ? (
+                              <p className="truncate text-[10px] leading-4 text-faint">{skill.skill_id}</p>
+                            ) : null}
                           </div>
 
                           <div className="flex shrink-0 items-center gap-1">
                             <button
                               onClick={() => openUrl(`https://skills.sh/${skill.source}/${skill.skill_id}`)}
-                              className="rounded-[5px] p-1.5 text-muted transition-colors hover:bg-surface-hover hover:text-secondary"
+                              className="rounded-[5px] p-1 text-muted transition-colors hover:bg-surface-hover hover:text-secondary"
                               title={t("install.viewOnWeb")}
                             >
                               <ExternalLink className="h-3.5 w-3.5" />
@@ -446,7 +452,7 @@ export function InstallSkills() {
                             <button
                               onClick={() => handleInstallSkillssh(skill)}
                               disabled={installing === skill.id}
-                              className="rounded-[5px] border border-accent-border bg-accent-dark p-1.5 text-white transition-colors hover:bg-accent disabled:opacity-50"
+                              className="rounded-[5px] border border-accent-border bg-accent-dark p-1 text-white transition-colors hover:bg-accent disabled:opacity-50"
                               title={t("install.oneClickInstall")}
                             >
                               {installing === skill.id ? (
@@ -458,11 +464,11 @@ export function InstallSkills() {
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="rounded-[5px] bg-accent-bg px-1.5 py-0.5 text-[10px] font-medium text-accent-light">
+                        <div className="flex flex-wrap items-center gap-1">
+                          <span className="rounded-[5px] bg-accent-bg px-1.5 py-0.5 text-[10px] leading-4 font-medium text-accent-light">
                             @{skill.source}
                           </span>
-                          <span className="inline-flex items-center gap-1 rounded-[5px] border border-border-subtle bg-background px-1.5 py-0.5 text-[10px] text-muted">
+                          <span className="inline-flex items-center gap-1 rounded-[5px] border border-border-subtle bg-background px-1.5 py-0.5 text-[10px] leading-4 text-muted">
                             <DownloadCloud className="h-3 w-3" />
                             {skill.installs > 1000
                               ? `${(skill.installs / 1000).toFixed(0)}k`
@@ -470,7 +476,8 @@ export function InstallSkills() {
                           </span>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {totalMarketPages > 1 ? (
