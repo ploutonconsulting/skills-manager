@@ -147,6 +147,7 @@
       "search": "正在搜索 “{{query}}”"
     },
     "filters": {
+      "source": "来源",
       "allSources": "全部来源",
       "filteredCount": "当前 {{count}} 条结果"
     },

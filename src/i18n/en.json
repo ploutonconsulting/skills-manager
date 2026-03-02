@@ -147,6 +147,7 @@
       "search": "Searching for \"{{query}}\""
     },
     "filters": {
+      "source": "Source",
       "allSources": "All sources",
       "filteredCount": "{{count}} results right now"
     },

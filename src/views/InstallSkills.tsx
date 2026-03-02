@@ -284,11 +284,11 @@ export function InstallSkills() {
 
       {activeTab === "market" && (
         <div className="animate-in fade-in duration-300">
-          <div className="mb-4 rounded-lg border border-border-subtle bg-surface p-4">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] text-muted">
+          <div className="mb-3 rounded-lg border border-border-subtle bg-surface p-3">
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
+                <div className="min-w-0">
+                  <div className="mb-1.5 flex flex-wrap items-center gap-2 text-[11px] text-muted">
                     <span className="inline-flex items-center gap-1.5 rounded-[5px] border border-border-subtle bg-background px-2 py-1 font-medium text-tertiary">
                       <Box className="h-3 w-3" />
                       {t("install.browseMarket")}
@@ -302,8 +302,38 @@ export function InstallSkills() {
                     <span className="text-faint">·</span>
                     <span>{t("install.filters.filteredCount", { count: filteredMarketSkills.length })}</span>
                   </div>
+                </div>
 
-                  <div className="relative max-w-[560px]">
+                <div className="flex flex-col gap-1.5 lg:flex-row lg:items-center">
+                  {!hasMarketQuery ? (
+                    <div className="flex shrink-0 rounded-[6px] border border-border-subtle bg-background p-0.5">
+                      {[
+                        { id: "hot" as const, label: t("install.hot"), icon: Star },
+                        { id: "trending" as const, label: t("install.trending"), icon: TrendingUp },
+                        { id: "alltime" as const, label: t("install.all"), icon: Clock },
+                      ].map((tab) => {
+                        const Icon = tab.icon;
+                        const isActive = marketTab === tab.id;
+                        return (
+                          <button
+                            key={tab.id}
+                            onClick={() => setMarketTab(tab.id)}
+                            className={cn(
+                              "flex items-center gap-1.5 rounded-[5px] px-3 py-2 text-[11px] font-medium transition-colors outline-none",
+                              isActive
+                                ? "bg-surface-active text-secondary"
+                                : "text-muted hover:text-tertiary"
+                            )}
+                          >
+                            <Icon className="h-3 w-3" />
+                            {tab.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+
+                  <div className="relative flex-1 lg:max-w-[640px]">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
                     <input
                       type="text"
@@ -314,57 +344,20 @@ export function InstallSkills() {
                     />
                   </div>
                 </div>
-
-                {!hasMarketQuery ? (
-                  <div className="flex rounded-[6px] border border-border-subtle bg-background p-0.5">
-                    {[
-                      { id: "hot" as const, label: t("install.hot"), icon: Star },
-                      { id: "trending" as const, label: t("install.trending"), icon: TrendingUp },
-                      { id: "alltime" as const, label: t("install.all"), icon: Clock },
-                    ].map((tab) => {
-                      const Icon = tab.icon;
-                      const isActive = marketTab === tab.id;
-                      return (
-                        <button
-                          key={tab.id}
-                          onClick={() => setMarketTab(tab.id)}
-                          className={cn(
-                            "flex items-center gap-1.5 rounded-[5px] px-3 py-2 text-[11px] font-medium transition-colors outline-none",
-                            isActive
-                              ? "bg-surface-active text-secondary"
-                              : "text-muted hover:text-tertiary"
-                          )}
-                        >
-                          <Icon className="h-3 w-3" />
-                          {tab.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : null}
               </div>
 
-              <div className="border-t border-border-subtle pt-3">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-[11px] text-muted">
-                    <span className="font-medium text-tertiary">{t("install.filters.allSources")}</span>
-                    {marketSourceFilter !== "all" ? (
-                      <>
-                        <span className="text-faint">·</span>
-                        <span>@{marketSourceFilter}</span>
-                      </>
-                    ) : null}
-                  </div>
-                  <div className="text-[11px] text-faint">{sourceOptions.length + 1} filters</div>
-                </div>
-
-                <div className="overflow-x-auto scrollbar-hide">
-                  <div className="flex min-w-max gap-2 pr-2">
+              <div className="border-t border-border-subtle pt-2">
+                <div className="flex items-center gap-3">
+                  <span className="shrink-0 text-[11px] font-medium text-tertiary">
+                    {t("install.filters.source")}
+                  </span>
+                  <div className="min-w-0 flex-1 overflow-x-auto scrollbar-hide">
+                  <div className="flex min-w-max justify-end gap-1.5 pr-1">
                     <button
                       type="button"
                       onClick={() => setMarketSourceFilter("all")}
                       className={cn(
-                        "rounded-full border px-3 py-1.5 text-[11px] font-medium whitespace-nowrap transition-colors",
+                        "rounded-full border px-2.5 py-1 text-[11px] font-medium whitespace-nowrap transition-colors",
                         marketSourceFilter === "all"
                           ? "border-accent-border bg-accent-bg text-accent-light"
                           : "border-border-subtle bg-background text-muted hover:text-secondary"
@@ -378,7 +371,7 @@ export function InstallSkills() {
                         type="button"
                         onClick={() => setMarketSourceFilter(source)}
                         className={cn(
-                          "rounded-full border px-3 py-1.5 text-[11px] font-medium whitespace-nowrap transition-colors",
+                          "rounded-full border px-2.5 py-1 text-[11px] font-medium whitespace-nowrap transition-colors",
                           marketSourceFilter === source
                             ? "border-accent-border bg-accent-bg text-accent-light"
                             : "border-border-subtle bg-background text-muted hover:text-secondary"
@@ -387,6 +380,7 @@ export function InstallSkills() {
                         @{source}
                       </button>
                     ))}
+                  </div>
                   </div>
                 </div>
               </div>
@@ -432,44 +426,49 @@ export function InstallSkills() {
                     {paginatedMarketSkills.map((skill) => (
                       <div
                         key={skill.id}
-                        className="flex items-center gap-3 rounded-lg border border-border-subtle bg-surface p-3.5 transition-colors hover:border-border"
+                        className="flex flex-col gap-2.5 rounded-lg border border-border-subtle bg-surface p-3 transition-colors hover:border-border"
                       >
-                        <div className="min-w-0 flex-1">
-                          <h3 className="truncate text-[13px] font-semibold text-secondary">
-                            {skill.name || skill.skill_id}
-                          </h3>
-                          <div className="mt-1 flex items-center gap-2">
-                            <span className="rounded bg-accent-bg px-1.5 py-0.5 text-[10px] font-medium text-accent-light">
-                              @{skill.source}
-                            </span>
-                            <span className="flex items-center gap-1 text-[10px] text-muted">
-                              <DownloadCloud className="h-3 w-3" />
-                              {skill.installs > 1000
-                                ? `${(skill.installs / 1000).toFixed(0)}k`
-                                : skill.installs}
-                            </span>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="truncate text-[13px] font-semibold text-secondary">
+                              {skill.name || skill.skill_id}
+                            </h3>
+                            <p className="mt-0.5 truncate text-[10px] text-faint">{skill.skill_id}</p>
+                          </div>
+
+                          <div className="flex shrink-0 items-center gap-1">
+                            <button
+                              onClick={() => openUrl(`https://skills.sh/${skill.source}/${skill.skill_id}`)}
+                              className="rounded-[5px] p-1.5 text-muted transition-colors hover:bg-surface-hover hover:text-secondary"
+                              title={t("install.viewOnWeb")}
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleInstallSkillssh(skill)}
+                              disabled={installing === skill.id}
+                              className="rounded-[5px] border border-accent-border bg-accent-dark p-1.5 text-white transition-colors hover:bg-accent disabled:opacity-50"
+                              title={t("install.oneClickInstall")}
+                            >
+                              {installing === skill.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Plus className="h-3.5 w-3.5" />
+                              )}
+                            </button>
                           </div>
                         </div>
-                        <div className="flex shrink-0 items-center gap-1.5">
-                          <button
-                            onClick={() => openUrl(`https://skills.sh/${skill.source}/${skill.skill_id}`)}
-                            className="rounded-[4px] p-1.5 text-muted transition-colors hover:bg-surface-hover hover:text-secondary"
-                            title={t("install.viewOnWeb")}
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleInstallSkillssh(skill)}
-                            disabled={installing === skill.id}
-                            className="rounded-[4px] border border-accent-border bg-accent-dark p-1.5 text-white transition-colors hover:bg-accent disabled:opacity-50"
-                            title={t("install.oneClickInstall")}
-                          >
-                            {installing === skill.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Plus className="h-3.5 w-3.5" />
-                            )}
-                          </button>
+
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="rounded-[5px] bg-accent-bg px-1.5 py-0.5 text-[10px] font-medium text-accent-light">
+                            @{skill.source}
+                          </span>
+                          <span className="inline-flex items-center gap-1 rounded-[5px] border border-border-subtle bg-background px-1.5 py-0.5 text-[10px] text-muted">
+                            <DownloadCloud className="h-3 w-3" />
+                            {skill.installs > 1000
+                              ? `${(skill.installs / 1000).toFixed(0)}k`
+                              : skill.installs}
+                          </span>
                         </div>
                       </div>
                     ))}
