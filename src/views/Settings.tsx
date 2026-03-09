@@ -15,6 +15,7 @@ import {
   Moon,
   Monitor,
   BookOpen,
+  Download,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -23,6 +24,7 @@ import { cn } from "../utils";
 import { useApp } from "../context/AppContext";
 import { useThemeContext } from "../context/ThemeContext";
 import * as api from "../lib/tauri";
+import type { AppUpdateInfo } from "../lib/tauri";
 import type { Theme } from "../hooks/useTheme";
 
 export function Settings() {
@@ -35,6 +37,8 @@ export function Settings() {
   const [openingRepo, setOpeningRepo] = useState(false);
   const [openingGithub, setOpeningGithub] = useState(false);
   const [centralRepoPath, setCentralRepoPath] = useState("");
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
   const GITHUB_URL = "https://github.com/xingkongliang/skills-manager";
 
   useEffect(() => {
@@ -93,6 +97,24 @@ export function Settings() {
       toast.error(t("common.error"));
     } finally {
       setOpeningGithub(false);
+    }
+  };
+
+  const handleCheckUpdate = async () => {
+    setCheckingUpdate(true);
+    setUpdateInfo(null);
+    try {
+      const info = await api.checkAppUpdate();
+      setUpdateInfo(info);
+      if (info.has_update) {
+        toast.info(t("settings.updateAvailable", { version: info.latest_version }));
+      } else {
+        toast.success(t("settings.noUpdate"));
+      }
+    } catch {
+      toast.error(t("settings.updateError"));
+    } finally {
+      setCheckingUpdate(false);
     }
   };
 
@@ -322,10 +344,40 @@ export function Settings() {
               </div>
               <div>
                 <h3 className="text-[13px] font-semibold text-primary">{t("settings.version")}</h3>
-                <p className="text-muted text-[13px]">{t("settings.tagline")}</p>
+                <p className="text-muted text-[13px]">
+                  {t("settings.tagline")}
+                  {updateInfo?.has_update && (
+                    <span className="ml-2 text-amber-500 font-medium">
+                      {t("settings.updateAvailable", { version: updateInfo.latest_version })}
+                    </span>
+                  )}
+                </p>
               </div>
             </div>
             <div className="flex gap-2">
+              {updateInfo?.has_update ? (
+                <button
+                  type="button"
+                  onClick={() => openUrl(updateInfo.release_url)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[4px] bg-accent text-white text-[13px] font-medium transition-colors border border-accent hover:opacity-90 outline-none"
+                >
+                  <Download className="w-3 h-3" /> {t("settings.download")}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleCheckUpdate}
+                  disabled={checkingUpdate}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[4px] bg-surface-hover hover:bg-surface-active text-tertiary text-[13px] font-medium transition-colors border border-border outline-none disabled:opacity-60"
+                >
+                  {checkingUpdate ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-3 h-3" />
+                  )}
+                  {checkingUpdate ? t("settings.checking") : t("settings.checkUpdate")}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={openHelp}

@@ -167,6 +167,16 @@ export const getCentralRepoPath = () =>
 export const openCentralRepoFolder = () =>
   invoke<void>("open_central_repo_folder");
 
+export interface AppUpdateInfo {
+  has_update: boolean;
+  current_version: string;
+  latest_version: string;
+  release_url: string;
+}
+
+export const checkAppUpdate = () =>
+  invoke<AppUpdateInfo>("check_app_update");
+
 // ── Scenarios ──
 
 export const getScenarios = () => invoke<Scenario[]>("get_scenarios");

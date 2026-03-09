@@ -219,7 +219,13 @@
     "help": "帮助",
     "about": "关于",
     "version": "Skills Manager 1.1.1",
-    "tagline": "跨平台。极简、高效、无感多场景切换。"
+    "tagline": "跨平台。极简、高效、无感多场景切换。",
+    "checkUpdate": "检查更新",
+    "checking": "检查中…",
+    "updateAvailable": "发现新版本 {{version}}！",
+    "noUpdate": "当前已是最新版本。",
+    "download": "下载",
+    "updateError": "检查更新失败。"
   },
   "common": {
     "loading": "加载中...",

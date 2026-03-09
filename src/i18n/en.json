@@ -219,7 +219,13 @@
     "help": "Help",
     "about": "About",
     "version": "Skills Manager 1.1.1",
-    "tagline": "Cross-platform. Minimal, efficient, seamless multi-scenario switching."
+    "tagline": "Cross-platform. Minimal, efficient, seamless multi-scenario switching.",
+    "checkUpdate": "Check for Updates",
+    "checking": "Checking…",
+    "updateAvailable": "New version {{version}} available!",
+    "noUpdate": "You're on the latest version.",
+    "download": "Download",
+    "updateError": "Failed to check for updates."
   },
   "common": {
     "loading": "Loading...",
