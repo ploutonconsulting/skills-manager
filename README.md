@@ -24,7 +24,9 @@
 
 - **Unified skill library** — Install skills from Git repos, local folders, `.zip` / `.skill` archives, or the [skills.sh](https://skills.sh) marketplace. Everything goes into one central repo at `~/.skills-manager`.
 - **Multi-tool sync** — Sync skills to any supported tool via symlink or copy with a single click.
+- **Project Skills** — View and manage skills inside any project's `.claude/skills/` directory, with bidirectional sync to your central library.
 - **Scenarios** — Group skills into scenarios and switch between them instantly.
+- **Skill tagging** — Tag skills and filter by tag for quick lookup.
 - **Update tracking** — Check for upstream updates on Git-based skills; re-import local ones.
 - **Skill preview** — Read `SKILL.md` / `README.md` docs right inside the app.
 - **Git backup** — Version-control your skill library with Git for backup and multi-machine sync.
