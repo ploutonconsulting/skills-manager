@@ -1,5 +1,6 @@
 pub mod central_repo;
 pub mod content_hash;
+pub mod git_backup;
 pub mod git_fetcher;
 pub mod installer;
 pub mod scanner;

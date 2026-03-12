@@ -177,6 +177,37 @@ export interface AppUpdateInfo {
 export const checkAppUpdate = () =>
   invoke<AppUpdateInfo>("check_app_update");
 
+// ── Git Backup ──
+
+export interface GitBackupStatus {
+  is_repo: boolean;
+  remote_url: string | null;
+  branch: string | null;
+  has_changes: boolean;
+  ahead: number;
+  behind: number;
+  last_commit: string | null;
+  last_commit_time: string | null;
+}
+
+export const gitBackupStatus = () =>
+  invoke<GitBackupStatus>("git_backup_status");
+
+export const gitBackupInit = () => invoke<void>("git_backup_init");
+
+export const gitBackupSetRemote = (url: string) =>
+  invoke<void>("git_backup_set_remote", { url });
+
+export const gitBackupCommit = (message: string) =>
+  invoke<void>("git_backup_commit", { message });
+
+export const gitBackupPush = () => invoke<void>("git_backup_push");
+
+export const gitBackupPull = () => invoke<void>("git_backup_pull");
+
+export const gitBackupClone = (url: string) =>
+  invoke<void>("git_backup_clone", { url });
+
 // ── Scenarios ──
 
 export const getScenarios = () => invoke<Scenario[]>("get_scenarios");

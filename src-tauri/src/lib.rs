@@ -62,6 +62,14 @@ pub fn run() {
             commands::settings::get_central_repo_path,
             commands::settings::open_central_repo_folder,
             commands::settings::check_app_update,
+            // Git Backup
+            commands::git_backup::git_backup_status,
+            commands::git_backup::git_backup_init,
+            commands::git_backup::git_backup_set_remote,
+            commands::git_backup::git_backup_commit,
+            commands::git_backup::git_backup_push,
+            commands::git_backup::git_backup_pull,
+            commands::git_backup::git_backup_clone,
             // Scenarios
             commands::scenarios::get_scenarios,
             commands::scenarios::get_active_scenario,

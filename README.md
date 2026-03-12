@@ -23,6 +23,29 @@
 - **Scenarios** — Group skills into scenarios and switch between them instantly.
 - **Update tracking** — Check for upstream updates on Git-based skills; re-import local ones.
 - **Skill preview** — Read `SKILL.md` / `README.md` docs right inside the app.
+- **Git backup** — Version-control your skill library with Git for backup and multi-machine sync.
+
+## Git Backup
+
+Back up `~/.skills-manager/skills/` to a Git repo for version history and multi-machine sync.
+
+### Quick setup
+
+1. Create a private repository (recommended).
+2. Open **Settings → Git Backup**.
+3. Choose one:
+- Existing remote: open **Advanced Settings**, set remote URL, click **Start Backup** (clone).
+- New local repo: click **Start Backup** directly, then set remote URL in **Advanced Settings**.
+4. Click **Sync Now**.
+
+`Sync Now` automatically does pull/commit/push based on current repo status.
+
+### Authentication
+
+- SSH URL (`git@github.com:...`): requires SSH key configured on your machine and added to GitHub.
+- HTTPS URL (`https://github.com/...`): push usually requires a Personal Access Token (PAT).
+
+> **Note:** The SQLite database (`~/.skills-manager/skills-manager.db`) is not included in Git — it stores metadata that can be rebuilt by scanning the skill files.
 
 ## Supported Tools
 

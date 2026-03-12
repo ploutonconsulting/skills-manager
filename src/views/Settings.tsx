@@ -16,6 +16,8 @@ import {
   Monitor,
   BookOpen,
   Download,
+  GitBranch,
+  ArrowUpCircle,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -25,7 +27,7 @@ import { cn } from "../utils";
 import { useApp } from "../context/AppContext";
 import { useThemeContext } from "../context/ThemeContext";
 import * as api from "../lib/tauri";
-import type { AppUpdateInfo } from "../lib/tauri";
+import type { AppUpdateInfo, GitBackupStatus } from "../lib/tauri";
 import type { Theme } from "../hooks/useTheme";
 
 const IS_WINDOWS = navigator.userAgent.includes("Windows");
@@ -43,12 +45,56 @@ export function Settings() {
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
   const [installing, setInstalling] = useState(false);
+  // Git backup state
+  const [gitStatus, setGitStatus] = useState<GitBackupStatus | null>(null);
+  const [gitRemoteInput, setGitRemoteInput] = useState("");
+  const [gitCommitMsg, setGitCommitMsg] = useState("");
+  const [gitLoading, setGitLoading] = useState<string | null>(null); // "start" | "sync" | "remote"
+  const [gitAdvancedOpen, setGitAdvancedOpen] = useState(false);
   const GITHUB_URL = "https://github.com/xingkongliang/skills-manager";
+
+  const mapGitError = (error: unknown) => {
+    const message = String(error);
+    if (
+      message.includes("Authentication failed")
+      || message.includes("Permission denied")
+      || message.includes("could not read Username")
+    ) {
+      return t("settings.gitErrorAuth");
+    }
+    if (
+      message.includes("Could not resolve host")
+      || message.includes("Failed to connect")
+      || message.includes("Connection timed out")
+    ) {
+      return t("settings.gitErrorNetwork");
+    }
+    if (message.includes("CONFLICT") || message.includes("conflict")) {
+      return t("settings.gitErrorConflict");
+    }
+    if (message.includes("not a git repository")) {
+      return t("settings.gitErrorNotRepo");
+    }
+    return t("settings.gitErrorGeneric");
+  };
+
+  const refreshGitStatus = async () => {
+    try {
+      const status = await api.gitBackupStatus();
+      setGitStatus(status);
+      if (status.remote_url && !gitRemoteInput) {
+        setGitRemoteInput(status.remote_url);
+      }
+    } catch {
+      // not critical
+    }
+  };
 
   useEffect(() => {
     api.getSettings("sync_mode").then((v) => { if (v) setSyncMode(v); });
     api.getSettings("default_scenario").then((v) => { if (v) setDefaultScenario(v); });
     api.getCentralRepoPath().then(setCentralRepoPath).catch(() => {});
+    refreshGitStatus();
   }, []);
 
   const handleRefresh = async () => {
@@ -140,6 +186,86 @@ export function Settings() {
       }
     } finally {
       setInstalling(false);
+    }
+  };
+
+  const handleGitStartBackup = async () => {
+    setGitLoading("start");
+    try {
+      if (gitRemoteInput.trim()) {
+        await api.gitBackupClone(gitRemoteInput.trim());
+        toast.success(t("settings.gitCloneSuccess"));
+      } else {
+        await api.gitBackupInit();
+        toast.success(t("settings.gitInitSuccess"));
+      }
+      await refreshGitStatus();
+    } catch (e) {
+      toast.error(mapGitError(e));
+    } finally {
+      setGitLoading(null);
+    }
+  };
+
+  const handleGitSetRemote = async () => {
+    if (!gitRemoteInput.trim()) return;
+    setGitLoading("remote");
+    try {
+      await api.gitBackupSetRemote(gitRemoteInput.trim());
+      toast.success(t("settings.gitRemoteSet"));
+      await refreshGitStatus();
+    } catch (e) {
+      toast.error(mapGitError(e));
+    } finally {
+      setGitLoading(null);
+    }
+  };
+
+  const handleGitSync = async () => {
+    setGitLoading("sync");
+    try {
+      let status = await api.gitBackupStatus();
+      if (!status.is_repo) {
+        toast.info(t("settings.gitNotInitialized"));
+        return;
+      }
+      if (!status.remote_url) {
+        setGitAdvancedOpen(true);
+        toast.info(t("settings.gitNeedRemoteSetup"));
+        return;
+      }
+
+      if (status.behind > 0 && (status.has_changes || status.ahead > 0)) {
+        toast.info(t("settings.gitNeedPullFirst"));
+        return;
+      }
+
+      if (status.behind > 0) {
+        await api.gitBackupPull();
+        status = await api.gitBackupStatus();
+        toast.success(t("settings.gitPullSuccess"));
+      }
+
+      let committed = false;
+      if (status.has_changes) {
+        const msg = gitCommitMsg.trim() || t("settings.gitCommitPlaceholder");
+        await api.gitBackupCommit(msg);
+        committed = true;
+      }
+
+      if (committed || status.ahead > 0) {
+        await api.gitBackupPush();
+        toast.success(t("settings.gitSyncSuccess"));
+        if (committed) setGitCommitMsg("");
+      } else {
+        toast.success(t("settings.gitUpToDate"));
+      }
+
+      await refreshGitStatus();
+    } catch (e) {
+      toast.error(mapGitError(e));
+    } finally {
+      setGitLoading(null);
     }
   };
 
@@ -357,6 +483,131 @@ export function Settings() {
                 </select>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Git Backup */}
+        <section>
+          <h2 className="app-section-title mb-3">
+            <GitBranch className="w-3.5 h-3.5 inline-block mr-1.5 -mt-0.5" />
+            {t("settings.gitBackup")}
+          </h2>
+          <div className="app-panel overflow-hidden divide-y divide-border-subtle">
+            {!gitStatus?.is_repo ? (
+              <div className="px-4 py-2.5">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleGitStartBackup}
+                    disabled={!!gitLoading}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] bg-accent text-white text-[13px] font-medium transition-colors hover:opacity-90 outline-none disabled:opacity-60"
+                  >
+                    {gitLoading === "start" ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <GitBranch className="w-3 h-3" />
+                    )}
+                    {gitLoading === "start" ? t("settings.gitInitializing") : t("settings.gitStartBackup")}
+                  </button>
+                  <span className="text-[13px] text-muted">{t("settings.gitNotInitialized")}</span>
+                </div>
+                <p className="text-[12px] text-muted mt-1.5">{t("settings.gitStartHint")}</p>
+              </div>
+            ) : (
+              <div className="px-4 py-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="text-[13px] text-secondary font-medium">
+                    {!gitStatus.remote_url
+                      ? t("settings.gitNoRemote")
+                      : gitStatus.behind > 0 && (gitStatus.has_changes || gitStatus.ahead > 0)
+                        ? t("settings.gitNeedPullFirst")
+                        : gitStatus.has_changes || gitStatus.ahead > 0
+                          ? t("settings.gitPendingSync")
+                          : t("settings.gitUpToDate")}
+                  </div>
+                  <button
+                    onClick={handleGitSync}
+                    disabled={!!gitLoading}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] bg-accent text-white text-[13px] font-medium transition-colors hover:opacity-90 outline-none disabled:opacity-60"
+                  >
+                    {gitLoading === "sync" ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <ArrowUpCircle className="w-3 h-3" />
+                    )}
+                    {gitLoading === "sync" ? t("settings.gitSyncing") : t("settings.gitSyncNow")}
+                  </button>
+                  <span className="text-[13px] text-muted">
+                    {gitStatus.has_changes
+                      ? t("settings.gitHasChanges")
+                      : t("settings.gitNoChanges")}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="px-4 py-2.5">
+              <button
+                onClick={() => setGitAdvancedOpen((v) => !v)}
+                className="text-[13px] text-accent hover:text-accent-light transition-colors font-medium outline-none"
+              >
+                {gitAdvancedOpen ? t("settings.gitHideAdvanced") : t("settings.gitShowAdvanced")}
+              </button>
+            </div>
+
+            {gitAdvancedOpen && (
+              <div className="px-4 py-2.5 space-y-2.5">
+                <div>
+                  <h3 className="text-[13px] text-secondary font-medium mb-1.5">{t("settings.gitRemoteUrl")}</h3>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={gitRemoteInput}
+                      onChange={(e) => setGitRemoteInput(e.target.value)}
+                      placeholder={t("settings.gitRemoteUrlPlaceholder")}
+                      className="flex-1 h-8 rounded-[4px] border border-border-subtle bg-background px-2.5 text-[13px] text-secondary outline-none transition-colors focus:border-border font-mono"
+                    />
+                    <button
+                      onClick={handleGitSetRemote}
+                      disabled={!gitRemoteInput.trim() || gitLoading === "remote"}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] bg-surface-hover hover:bg-surface-active text-tertiary text-[13px] font-medium transition-colors border border-border outline-none disabled:opacity-60"
+                    >
+                      {gitLoading === "remote" ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <LinkIcon className="w-3 h-3" />
+                      )}
+                      {t("settings.gitSetRemote")}
+                    </button>
+                  </div>
+                </div>
+
+                {gitStatus?.is_repo && (
+                  <div className="grid grid-cols-2 gap-2 text-[13px]">
+                    <div className="text-muted">{t("settings.gitBranch")}: <span className="text-secondary">{gitStatus.branch || "main"}</span></div>
+                    <div className="text-muted">{t("settings.gitAhead", { count: gitStatus.ahead })} / {t("settings.gitBehind", { count: gitStatus.behind })}</div>
+                  </div>
+                )}
+
+                {gitStatus?.is_repo && gitStatus.last_commit && (
+                  <div className="text-[13px] text-muted">
+                    {t("settings.gitLastCommit")}: <span className="text-tertiary">{gitStatus.last_commit}</span>
+                  </div>
+                )}
+
+                {gitStatus?.is_repo && (
+                  <div>
+                    <h3 className="text-[13px] text-secondary font-medium mb-1.5">{t("settings.gitCommitMessage")}</h3>
+                    <input
+                      type="text"
+                      value={gitCommitMsg}
+                      onChange={(e) => setGitCommitMsg(e.target.value)}
+                      placeholder={t("settings.gitCommitPlaceholder")}
+                      className="w-full h-8 rounded-[4px] border border-border-subtle bg-background px-2.5 text-[13px] text-secondary outline-none transition-colors focus:border-border"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </section>
 
