@@ -68,6 +68,18 @@ jobs:
         if: matrix.platform == 'windows-latest'
         run: cargo check --manifest-path src-tauri/Cargo.toml
 
+      - name: Extract changelog for current version
+        id: changelog
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          BODY=$(sed -n "/^## \[${VERSION}\]/,/^## \[/{ /^## \[${VERSION}\]/d; /^## \[/d; p; }" CHANGELOG.md)
+          echo "body<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$BODY" >> "$GITHUB_OUTPUT"
+          echo "" >> "$GITHUB_OUTPUT"
+          echo "---" >> "$GITHUB_OUTPUT"
+          echo "Full changelog: [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
       - name: Build with Tauri
         uses: tauri-apps/tauri-action@v0
         env:
@@ -76,8 +88,8 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: 'Skills Manager v__VERSION__'
-          releaseBody: 'See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.'
-          releaseDraft: true
+          releaseBody: ${{ steps.changelog.outputs.body }}
+          releaseDraft: false
           prerelease: false
           updaterJsonKeepUniversal: true
           args: --target ${{ matrix.target }}
