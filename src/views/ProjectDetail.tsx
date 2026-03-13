@@ -227,6 +227,9 @@ export function ProjectDetail() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t("project.searchPlaceholder")}
               className="app-input w-full pl-9 font-medium"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
             />
           </div>
           <div className="app-segmented">
@@ -715,6 +718,9 @@ function ExportFromCenterDialog({
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t("project.searchCenterSkills")}
               className="app-input w-full pl-9 font-medium"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               autoFocus
             />
           </div>

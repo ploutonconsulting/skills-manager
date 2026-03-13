@@ -523,6 +523,9 @@ export function MySkills() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t("mySkills.searchPlaceholder")}
               className="app-input w-full pl-9 font-medium"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
             />
           </div>
 

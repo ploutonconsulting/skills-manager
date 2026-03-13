@@ -460,6 +460,9 @@ export function InstallSkills() {
                       }}
                       placeholder={t("install.searchMarket")}
                       className="app-input w-full bg-background pl-9"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                     />
                   </div>
                 </div>
