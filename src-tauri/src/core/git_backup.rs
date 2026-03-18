@@ -246,8 +246,8 @@ pub fn create_snapshot_tag(skills_dir: &Path) -> Result<String> {
 
     // Avoid collision when multiple snapshots happen within the same second.
     if run_git(skills_dir, &["rev-parse", "-q", "--verify", &format!("refs/tags/{tag}")]).is_ok() {
-        let millis = Utc::now().format("%3f");
-        tag = format!("sm-v-{}{}-{}", timestamp, millis, short_sha);
+        let millis = Utc::now().timestamp_subsec_millis();
+        tag = format!("sm-v-{}-{:03}-{}", timestamp, millis, short_sha);
     }
 
     // Use lightweight tag to avoid requiring git user.name/user.email on client machines.
@@ -315,26 +315,27 @@ pub fn restore_snapshot_version(skills_dir: &Path, tag: &str) -> Result<()> {
         run_git_checked(skills_dir, &["read-tree", "--reset", "-u", tag])?;
 
         let changed = run_git(skills_dir, &["status", "--porcelain"])?;
-        if changed.is_empty() {
-            return Ok(());
+        if !changed.is_empty() {
+            run_git_checked(
+                skills_dir,
+                &["commit", "-m", &format!("restore: switch skills library to {}", tag)],
+            )?;
         }
-
-        run_git_checked(
-            skills_dir,
-            &["commit", "-m", &format!("restore: switch skills library to {}", tag)],
-        )?;
         Ok(())
     })();
 
+    // Always clean up the restore-point tag, regardless of outcome.
+    let cleanup = || { let _ = run_git(skills_dir, &["tag", "-d", &restore_point]); };
+
     match restore_result {
         Ok(()) => {
-            let _ = run_git_checked(skills_dir, &["tag", "-d", &restore_point]);
+            cleanup();
             Ok(())
         }
         Err(err) => {
             // Best-effort rollback to pre-restore HEAD.
             let _ = run_git_checked(skills_dir, &["read-tree", "--reset", "-u", &restore_point]);
-            let _ = run_git_checked(skills_dir, &["tag", "-d", &restore_point]);
+            cleanup();
             Err(err).context("Restore failed after mutating working tree; attempted automatic rollback")
         }
     }

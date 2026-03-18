@@ -9,7 +9,7 @@ use crate::core::{
     git_fetcher,
     install_cancel::InstallCancelRegistry,
     installer,
-    skill_metadata,
+    skill_metadata::{self, is_valid_skill_dir},
     skill_store::{SkillRecord, SkillStore, SkillTargetRecord},
     sync_engine,
 };
@@ -1039,14 +1039,6 @@ pub struct BatchImportResult {
     pub imported: usize,
     pub skipped: usize,
     pub errors: Vec<String>,
-}
-
-fn is_valid_skill_dir(dir: &Path) -> bool {
-    if !dir.is_dir() {
-        return false;
-    }
-    let candidates = ["SKILL.md", "skill.md", "CLAUDE.md"];
-    candidates.iter().any(|name| dir.join(name).exists())
 }
 
 #[tauri::command]

@@ -52,6 +52,15 @@ fn parse_frontmatter(content: &str) -> SkillMeta {
     }
 }
 
+/// Skill directory marker files used across the application.
+const SKILL_DIR_MARKERS: &[&str] = &["SKILL.md", "skill.md", "CLAUDE.md", "README.md", "readme.md"];
+
+/// Check whether a directory looks like a valid skill directory
+/// (contains at least one recognised marker file).
+pub fn is_valid_skill_dir(dir: &Path) -> bool {
+    dir.is_dir() && SKILL_DIR_MARKERS.iter().any(|name| dir.join(name).exists())
+}
+
 pub fn infer_skill_name(dir: &Path) -> String {
     let meta = parse_skill_md(dir);
     if let Some(name) = meta.name {

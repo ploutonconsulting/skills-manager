@@ -1,4 +1,4 @@
-use crate::core::{central_repo, git_backup};
+use crate::core::{central_repo, git_backup, skill_metadata};
 use std::sync::Arc;
 use tauri::State;
 use walkdir::WalkDir;
@@ -164,7 +164,7 @@ fn reconcile_skills_index(store: &SkillStore) -> anyhow::Result<()> {
         .flatten()
     {
         let path = entry.path().to_path_buf();
-        if !entry.file_type().is_dir() || !is_valid_skill_dir(&path) {
+        if !entry.file_type().is_dir() || !skill_metadata::is_valid_skill_dir(&path) {
             continue;
         }
 
@@ -212,11 +212,3 @@ fn reconcile_skills_index(store: &SkillStore) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn is_valid_skill_dir(dir: &std::path::Path) -> bool {
-    if !dir.is_dir() {
-        return false;
-    }
-    ["SKILL.md", "skill.md", "CLAUDE.md", "README.md", "readme.md"]
-        .iter()
-        .any(|name| dir.join(name).exists())
-}
