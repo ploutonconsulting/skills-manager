@@ -137,7 +137,8 @@ fn initialize_startup_scenario(store: &Arc<core::skill_store::SkillStore>) -> Re
 
     if current_active.as_deref() != Some(desired_active.as_str()) {
         if let Some(old_active) = current_active.as_deref() {
-            commands::scenarios::unsync_scenario_skills(store, old_active)?;
+            commands::scenarios::unsync_scenario_skills(store, old_active)
+                .map_err(|e| e.to_string())?;
         }
 
         store
@@ -145,6 +146,7 @@ fn initialize_startup_scenario(store: &Arc<core::skill_store::SkillStore>) -> Re
             .map_err(|e| e.to_string())?;
     }
 
-    commands::scenarios::sync_scenario_skills(store, &desired_active)?;
+    commands::scenarios::sync_scenario_skills(store, &desired_active)
+        .map_err(|e| e.to_string())?;
     Ok(())
 }

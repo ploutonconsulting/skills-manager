@@ -3,6 +3,7 @@ use std::sync::Arc;
 use tauri::State;
 
 use crate::core::{
+    error::AppError,
     skill_store::{SkillStore, SkillTargetRecord},
     sync_engine,
     tool_adapters,
@@ -13,30 +14,30 @@ pub async fn sync_skill_to_tool(
     skill_id: String,
     tool: String,
     store: State<'_, Arc<SkillStore>>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let adapter = tool_adapters::find_adapter(&tool)
-            .ok_or_else(|| format!("Unknown tool: {}", tool))?;
+            .ok_or_else(|| AppError::not_found(format!("Unknown tool: {}", tool)))?;
 
         if !adapter.is_installed() {
-            return Err(format!("{} is not installed", adapter.display_name));
+            return Err(AppError::not_found(format!("{} is not installed", adapter.display_name)));
         }
 
         let skill = store
             .get_skill_by_id(&skill_id)
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| "Skill not found".to_string())?;
+            .map_err(AppError::db)?
+            .ok_or_else(|| AppError::not_found("Skill not found"))?;
 
         let source = PathBuf::from(&skill.central_path);
         let target = adapter.skills_dir().join(&skill.name);
         let configured_mode = store
             .get_setting("sync_mode")
-            .map_err(|e| e.to_string())?;
+            .map_err(AppError::db)?;
         let mode = sync_engine::sync_mode_for_tool(&tool, configured_mode.as_deref());
 
         let actual_mode =
-            sync_engine::sync_skill(&source, &target, mode).map_err(|e| e.to_string())?;
+            sync_engine::sync_skill(&source, &target, mode).map_err(AppError::io)?;
 
         let now = chrono::Utc::now().timestamp_millis();
         let target_record = SkillTargetRecord {
@@ -52,12 +53,11 @@ pub async fn sync_skill_to_tool(
 
         store
             .insert_target(&target_record)
-            .map_err(|e| e.to_string())?;
+            .map_err(AppError::db)?;
 
         Ok(())
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
@@ -65,12 +65,12 @@ pub async fn unsync_skill_from_tool(
     skill_id: String,
     tool: String,
     store: State<'_, Arc<SkillStore>>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let targets = store
             .get_targets_for_skill(&skill_id)
-            .map_err(|e| e.to_string())?;
+            .map_err(AppError::db)?;
 
         if let Some(target) = targets.iter().find(|t| t.tool == tool) {
             let target_path = PathBuf::from(&target.target_path);
@@ -79,10 +79,9 @@ pub async fn unsync_skill_from_tool(
 
         store
             .delete_target(&skill_id, &tool)
-            .map_err(|e| e.to_string())?;
+            .map_err(AppError::db)?;
 
         Ok(())
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::State;
 
-use crate::core::{central_repo, installer, scanner, skill_store::SkillStore};
+use crate::core::{central_repo, error::AppError, installer, scanner, skill_store::SkillStore};
 
 #[derive(Debug, Serialize)]
 pub struct ScanResultDto {
@@ -13,14 +13,14 @@ pub struct ScanResultDto {
 }
 
 #[tauri::command]
-pub async fn scan_local_skills(store: State<'_, Arc<SkillStore>>) -> Result<ScanResultDto, String> {
+pub async fn scan_local_skills(store: State<'_, Arc<SkillStore>>) -> Result<ScanResultDto, AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let all_targets = store.get_all_targets().map_err(|e| e.to_string())?;
+        let all_targets = store.get_all_targets().map_err(AppError::db)?;
         let managed_paths: Vec<String> = all_targets.iter().map(|t| t.target_path.clone()).collect();
-        let managed_skills = store.get_all_skills().map_err(|e| e.to_string())?;
+        let managed_skills = store.get_all_skills().map_err(AppError::db)?;
 
-        let mut plan = scanner::scan_local_skills(&managed_paths).map_err(|e| e.to_string())?;
+        let mut plan = scanner::scan_local_skills(&managed_paths).map_err(AppError::io)?;
 
         for rec in &mut plan.discovered {
             if let Some(name) = rec.name_guess.as_deref() {
@@ -31,12 +31,12 @@ pub async fn scan_local_skills(store: State<'_, Arc<SkillStore>>) -> Result<Scan
         }
 
         // Clear and repopulate discovered
-        store.clear_discovered().map_err(|e| e.to_string())?;
+        store.clear_discovered().map_err(AppError::db)?;
         for rec in &plan.discovered {
-            store.insert_discovered(rec).map_err(|e| e.to_string())?;
+            store.insert_discovered(rec).map_err(AppError::db)?;
         }
 
-        let all_discovered = store.get_all_discovered().map_err(|e| e.to_string())?;
+        let all_discovered = store.get_all_discovered().map_err(AppError::db)?;
         let groups = scanner::group_discovered(&all_discovered);
 
         Ok(ScanResultDto {
@@ -45,8 +45,7 @@ pub async fn scan_local_skills(store: State<'_, Arc<SkillStore>>) -> Result<Scan
             groups,
         })
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
@@ -54,29 +53,29 @@ pub async fn import_existing_skill(
     source_path: String,
     name: Option<String>,
     store: State<'_, Arc<SkillStore>>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let path = PathBuf::from(&source_path);
         let resolved_name =
-            installer::resolve_local_skill_name(&path, name.as_deref()).map_err(|e| e.to_string())?;
+            installer::resolve_local_skill_name(&path, name.as_deref()).map_err(AppError::io)?;
         let central_path = central_repo::skills_dir().join(&resolved_name);
 
         if let Some(existing) = store
             .get_skill_by_central_path(&central_path.to_string_lossy())
-            .map_err(|e| e.to_string())?
+            .map_err(AppError::db)?
         {
             if let Ok(Some(scenario_id)) = store.get_active_scenario_id() {
                 store
                     .add_skill_to_scenario(&scenario_id, &existing.id)
-                    .map_err(|e| e.to_string())?;
+                    .map_err(AppError::db)?;
             }
             return Ok(());
         }
 
         let result =
             installer::install_from_local_to_destination(&path, Some(&resolved_name), &central_path)
-                .map_err(|e| e.to_string())?;
+                .map_err(AppError::io)?;
 
         let now = chrono::Utc::now().timestamp_millis();
         let id = uuid::Uuid::new_v4().to_string();
@@ -103,26 +102,25 @@ pub async fn import_existing_skill(
             last_check_error: None,
         };
 
-        store.insert_skill(&record).map_err(|e| e.to_string())?;
+        store.insert_skill(&record).map_err(AppError::db)?;
 
         // Auto-add to active scenario
         if let Ok(Some(scenario_id)) = store.get_active_scenario_id() {
             store
                 .add_skill_to_scenario(&scenario_id, &id)
-                .map_err(|e| e.to_string())?;
+                .map_err(AppError::db)?;
         }
 
         Ok(())
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
-pub async fn import_all_discovered(store: State<'_, Arc<SkillStore>>) -> Result<(), String> {
+pub async fn import_all_discovered(store: State<'_, Arc<SkillStore>>) -> Result<(), AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let discovered = store.get_all_discovered().map_err(|e| e.to_string())?;
+        let discovered = store.get_all_discovered().map_err(AppError::db)?;
         let groups = scanner::group_discovered(&discovered);
 
         let active_scenario = store.get_active_scenario_id().ok().flatten();
@@ -181,6 +179,5 @@ pub async fn import_all_discovered(store: State<'_, Arc<SkillStore>>) -> Result<
 
         Ok(())
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }

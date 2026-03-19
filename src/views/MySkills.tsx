@@ -27,7 +27,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { SkillDetailPanel } from "../components/SkillDetailPanel";
 import * as api from "../lib/tauri";
 import type { ManagedSkill, ToolInfo, GitBackupStatus, GitBackupVersion } from "../lib/tauri";
-import { getErrorMessage } from "../lib/error";
+import { getErrorMessage, getErrorKind } from "../lib/error";
 
 function getToolDisplayName(toolKey: string, tools: ToolInfo[]) {
   return tools.find((tool) => tool.key === toolKey)?.display_name || toolKey;
@@ -138,7 +138,15 @@ export function MySkills() {
   );
 
   const mapGitError = (error: unknown) => {
-    const message = String(error);
+    const kind = getErrorKind(error);
+    const message = getErrorMessage(error, "");
+
+    // Use structured kind for high-level classification
+    if (kind === "network") {
+      return t("settings.gitErrorNetwork");
+    }
+
+    // Fall back to message-based matching for git-specific sub-categories
     if (
       message.includes("Authentication failed")
       || message.includes("Permission denied")
@@ -160,7 +168,7 @@ export function MySkills() {
       return t("settings.gitErrorNotRepo");
     }
     const fallback = t("settings.gitErrorGeneric");
-    const detail = getErrorMessage(error, "").trim();
+    const detail = message.trim();
     if (detail && detail !== "Error") {
       return `${fallback} (${detail})`;
     }

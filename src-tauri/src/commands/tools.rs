@@ -1,5 +1,6 @@
 use serde::Serialize;
 
+use crate::core::error::AppError;
 use crate::core::tool_adapters;
 
 #[derive(Debug, Serialize)]
@@ -11,7 +12,7 @@ pub struct ToolInfoDto {
 }
 
 #[tauri::command]
-pub async fn get_tool_status() -> Result<Vec<ToolInfoDto>, String> {
+pub async fn get_tool_status() -> Result<Vec<ToolInfoDto>, AppError> {
     tauri::async_runtime::spawn_blocking(|| {
         let adapters = tool_adapters::default_tool_adapters();
         let result: Vec<ToolInfoDto> = adapters
@@ -25,6 +26,5 @@ pub async fn get_tool_status() -> Result<Vec<ToolInfoDto>, String> {
             .collect();
         Ok(result)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }

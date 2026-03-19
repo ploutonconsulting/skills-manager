@@ -3,7 +3,7 @@ use std::sync::Arc;
 use semver::Version;
 use tauri::State;
 
-use crate::core::{central_repo, skill_store::SkillStore};
+use crate::core::{central_repo, error::AppError, skill_store::SkillStore};
 
 #[derive(serde::Serialize)]
 pub struct AppUpdateInfo {
@@ -14,13 +14,12 @@ pub struct AppUpdateInfo {
 }
 
 #[tauri::command]
-pub async fn get_settings(key: String, store: State<'_, Arc<SkillStore>>) -> Result<Option<String>, String> {
+pub async fn get_settings(key: String, store: State<'_, Arc<SkillStore>>) -> Result<Option<String>, AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        store.get_setting(&key).map_err(|e| e.to_string())
+        store.get_setting(&key).map_err(AppError::db)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
@@ -28,13 +27,12 @@ pub async fn set_settings(
     key: String,
     value: String,
     store: State<'_, Arc<SkillStore>>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        store.set_setting(&key, &value).map_err(|e| e.to_string())
+        store.set_setting(&key, &value).map_err(AppError::db)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
@@ -43,7 +41,7 @@ pub fn get_central_repo_path() -> String {
 }
 
 #[tauri::command]
-pub async fn open_central_repo_folder() -> Result<(), String> {
+pub async fn open_central_repo_folder() -> Result<(), AppError> {
     tauri::async_runtime::spawn_blocking(|| {
         let repo_path = central_repo::base_dir();
 
@@ -62,40 +60,39 @@ pub async fn open_central_repo_folder() -> Result<(), String> {
         let status = cmd
             .arg(&repo_path)
             .status()
-            .map_err(|e| format!("Failed to open folder: {e}"))?;
+            .map_err(|e| AppError::io(format!("Failed to open folder: {e}")))?;
 
         // Windows explorer.exe returns exit code 1 even on success
         #[cfg(not(target_os = "windows"))]
         if !status.success() {
-            return Err(format!("File manager exited with status: {status}"));
+            return Err(AppError::io(format!("File manager exited with status: {status}")));
         }
 
         let _ = status;
         Ok(())
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
-pub async fn check_app_update(app: tauri::AppHandle) -> Result<AppUpdateInfo, String> {
+pub async fn check_app_update(app: tauri::AppHandle) -> Result<AppUpdateInfo, AppError> {
     let current_version = app.config().version.clone().unwrap_or_default();
     tauri::async_runtime::spawn_blocking(move || {
         let client = reqwest::blocking::Client::builder()
             .user_agent("skills-manager")
             .build()
-            .map_err(|e| e.to_string())?;
+            .map_err(AppError::network)?;
 
         let resp: serde_json::Value = client
             .get("https://api.github.com/repos/xingkongliang/skills-manager/releases/latest")
             .send()
-            .map_err(|e| format!("Network error: {e}"))?
+            .map_err(|e| AppError::network(format!("Network error: {e}")))?
             .json()
-            .map_err(|e| format!("Failed to parse response: {e}"))?;
+            .map_err(|e| AppError::network(format!("Failed to parse response: {e}")))?;
 
         let tag = resp["tag_name"]
             .as_str()
-            .ok_or("No tag_name in response")?;
+            .ok_or_else(|| AppError::network("No tag_name in response"))?;
         let latest_version = tag.strip_prefix('v').unwrap_or(tag).to_string();
         let release_url = resp["html_url"]
             .as_str()
@@ -111,8 +108,7 @@ pub async fn check_app_update(app: tauri::AppHandle) -> Result<AppUpdateInfo, St
             release_url,
         })
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 fn version_gt(a: &str, b: &str) -> bool {

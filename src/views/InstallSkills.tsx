@@ -30,7 +30,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useSearchParams } from "react-router-dom";
 import { listen } from "@tauri-apps/api/event";
 import { StatusBanner } from "../components/StatusBanner";
-import { getErrorMessage } from "../lib/error";
+import { getErrorMessage, getErrorKind } from "../lib/error";
 
 const MARKET_PAGE_SIZE = 24;
 const MARKET_SEARCH_STEP = 60;
@@ -344,11 +344,10 @@ export function InstallSkills() {
       await Promise.all([refreshScenarios(), refreshManagedSkills()]);
       toast.success(t("install.toast.success", { name: displayName }), { id: toastId });
     } catch (error: unknown) {
-      const msg = getErrorMessage(error, t("common.error"));
-      if (msg.includes("cancelled")) {
+      if (getErrorKind(error) === "cancelled") {
         toast.info(t("install.toast.cancelled"), { id: toastId });
       } else {
-        toast.error(msg, { id: toastId });
+        toast.error(getErrorMessage(error, t("common.error")), { id: toastId });
       }
     } finally {
       setInstalling(null);
@@ -391,11 +390,10 @@ export function InstallSkills() {
       await Promise.all([refreshScenarios(), refreshManagedSkills()]);
       toast.success(t("install.toast.success", { name: name || url }), { id: toastId });
     } catch (error: unknown) {
-      const msg = getErrorMessage(error, t("common.error"));
-      if (msg.includes("cancelled")) {
+      if (getErrorKind(error) === "cancelled") {
         toast.info(t("install.toast.cancelled"), { id: toastId });
       } else {
-        toast.error(msg, { id: toastId });
+        toast.error(getErrorMessage(error, t("common.error")), { id: toastId });
       }
     } finally {
       setGitLoading(false);

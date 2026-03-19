@@ -1,4 +1,4 @@
-use crate::core::{central_repo, git_backup, skill_metadata};
+use crate::core::{central_repo, error::AppError, git_backup, skill_metadata};
 use std::sync::Arc;
 use tauri::State;
 use walkdir::WalkDir;
@@ -8,139 +8,129 @@ use crate::core::skill_store::SkillStore;
 #[tauri::command]
 pub async fn git_backup_status(
     store: State<'_, Arc<SkillStore>>,
-) -> Result<git_backup::GitBackupStatus, String> {
+) -> Result<git_backup::GitBackupStatus, AppError> {
     let _ = store; // ensure DB is available
     let skills_dir = central_repo::skills_dir();
     tokio::task::spawn_blocking(move || {
-        git_backup::get_status(&skills_dir).map_err(|e| e.to_string())
+        git_backup::get_status(&skills_dir).map_err(AppError::git)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
 pub async fn git_backup_init(
     store: State<'_, Arc<SkillStore>>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let _ = store;
     let skills_dir = central_repo::skills_dir();
     tokio::task::spawn_blocking(move || {
-        git_backup::init_repo(&skills_dir).map_err(|e| e.to_string())
+        git_backup::init_repo(&skills_dir).map_err(AppError::git)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
 pub async fn git_backup_set_remote(
     store: State<'_, Arc<SkillStore>>,
     url: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let _ = store;
     let skills_dir = central_repo::skills_dir();
     tokio::task::spawn_blocking(move || {
-        git_backup::set_remote(&skills_dir, &url).map_err(|e| e.to_string())
+        git_backup::set_remote(&skills_dir, &url).map_err(AppError::git)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
 pub async fn git_backup_commit(
     store: State<'_, Arc<SkillStore>>,
     message: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let _ = store;
     let skills_dir = central_repo::skills_dir();
     tokio::task::spawn_blocking(move || {
-        git_backup::commit_all(&skills_dir, &message).map_err(|e| e.to_string())
+        git_backup::commit_all(&skills_dir, &message).map_err(AppError::git)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
 pub async fn git_backup_push(
     store: State<'_, Arc<SkillStore>>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let _ = store;
     let skills_dir = central_repo::skills_dir();
     tokio::task::spawn_blocking(move || {
-        git_backup::push(&skills_dir).map_err(|e| e.to_string())
+        git_backup::push(&skills_dir).map_err(AppError::git)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
 pub async fn git_backup_pull(
     store: State<'_, Arc<SkillStore>>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let _ = store;
     let skills_dir = central_repo::skills_dir();
     tokio::task::spawn_blocking(move || {
-        git_backup::pull(&skills_dir).map_err(|e| e.to_string())
+        git_backup::pull(&skills_dir).map_err(AppError::git)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
 pub async fn git_backup_clone(
     store: State<'_, Arc<SkillStore>>,
     url: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let _ = store;
     let skills_dir = central_repo::skills_dir();
     tokio::task::spawn_blocking(move || {
-        git_backup::clone_into(&skills_dir, &url).map_err(|e| e.to_string())
+        git_backup::clone_into(&skills_dir, &url).map_err(AppError::git)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
 pub async fn git_backup_create_snapshot(
     store: State<'_, Arc<SkillStore>>,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
     let _ = store;
     let skills_dir = central_repo::skills_dir();
     tokio::task::spawn_blocking(move || {
-        git_backup::create_snapshot_tag(&skills_dir).map_err(|e| e.to_string())
+        git_backup::create_snapshot_tag(&skills_dir).map_err(AppError::git)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
 pub async fn git_backup_list_versions(
     store: State<'_, Arc<SkillStore>>,
     limit: Option<u32>,
-) -> Result<Vec<git_backup::GitBackupVersion>, String> {
+) -> Result<Vec<git_backup::GitBackupVersion>, AppError> {
     let _ = store;
     let skills_dir = central_repo::skills_dir();
     tokio::task::spawn_blocking(move || {
         git_backup::list_snapshot_versions(&skills_dir, limit.map(|v| v as usize))
-            .map_err(|e| e.to_string())
+            .map_err(AppError::git)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
 pub async fn git_backup_restore_version(
     store: State<'_, Arc<SkillStore>>,
     tag: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let store = store.inner().clone();
     let skills_dir = central_repo::skills_dir();
     tokio::task::spawn_blocking(move || {
-        git_backup::restore_snapshot_version(&skills_dir, &tag).map_err(|e| e.to_string())?;
-        reconcile_skills_index(&store).map_err(|e| e.to_string())?;
+        git_backup::restore_snapshot_version(&skills_dir, &tag).map_err(AppError::git)?;
+        reconcile_skills_index(&store).map_err(AppError::db)?;
         Ok(())
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 fn reconcile_skills_index(store: &SkillStore) -> anyhow::Result<()> {
@@ -211,4 +201,3 @@ fn reconcile_skills_index(store: &SkillStore) -> anyhow::Result<()> {
 
     Ok(())
 }
-

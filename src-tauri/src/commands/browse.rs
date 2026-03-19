@@ -2,6 +2,7 @@ use std::sync::Arc;
 use tauri::State;
 
 use crate::core::{
+    error::AppError,
     skill_store::SkillStore,
     skillssh_api::{self, LeaderboardType, SkillsShSkill},
 };
@@ -12,7 +13,7 @@ const LEADERBOARD_CACHE_TTL: i64 = 300; // 5 minutes
 pub async fn fetch_leaderboard(
     board: String,
     store: State<'_, Arc<SkillStore>>,
-) -> Result<Vec<SkillsShSkill>, String> {
+) -> Result<Vec<SkillsShSkill>, AppError> {
     let cache_key = format!("leaderboard_{}", board);
 
     // Check cache
@@ -24,10 +25,9 @@ pub async fn fetch_leaderboard(
 
     let board_type = LeaderboardType::from_str(&board);
     let skills = tauri::async_runtime::spawn_blocking(move || {
-        skillssh_api::fetch_leaderboard(board_type).map_err(|e| e.to_string())
+        skillssh_api::fetch_leaderboard(board_type).map_err(AppError::network)
     })
-    .await
-    .map_err(|e| format!("failed to join leaderboard task: {e}"))??;
+    .await??;
 
     // Update cache
     if let Ok(json) = serde_json::to_string(&skills) {
@@ -38,12 +38,11 @@ pub async fn fetch_leaderboard(
 }
 
 #[tauri::command]
-pub async fn search_skillssh(query: String, limit: Option<usize>) -> Result<Vec<SkillsShSkill>, String> {
+pub async fn search_skillssh(query: String, limit: Option<usize>) -> Result<Vec<SkillsShSkill>, AppError> {
     let requested = limit.unwrap_or(60);
     let bounded = requested.clamp(1, 300);
     tauri::async_runtime::spawn_blocking(move || {
-        skillssh_api::search_skills(&query, bounded).map_err(|e| e.to_string())
+        skillssh_api::search_skills(&query, bounded).map_err(AppError::network)
     })
-    .await
-    .map_err(|e| format!("failed to join search task: {e}"))?
+    .await?
 }

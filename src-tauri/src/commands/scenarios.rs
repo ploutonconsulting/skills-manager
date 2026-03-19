@@ -4,6 +4,7 @@ use std::sync::Arc;
 use tauri::State;
 
 use crate::core::{
+    error::AppError,
     skill_store::{ScenarioRecord, SkillStore},
     sync_engine, tool_adapters,
 };
@@ -21,10 +22,10 @@ pub struct ScenarioDto {
 }
 
 #[tauri::command]
-pub async fn get_scenarios(store: State<'_, Arc<SkillStore>>) -> Result<Vec<ScenarioDto>, String> {
+pub async fn get_scenarios(store: State<'_, Arc<SkillStore>>) -> Result<Vec<ScenarioDto>, AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let scenarios = store.get_all_scenarios().map_err(|e| e.to_string())?;
+        let scenarios = store.get_all_scenarios().map_err(AppError::db)?;
         let mut result = Vec::new();
         for s in scenarios {
             let count = store
@@ -43,20 +44,19 @@ pub async fn get_scenarios(store: State<'_, Arc<SkillStore>>) -> Result<Vec<Scen
         }
         Ok(result)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
-pub async fn get_active_scenario(store: State<'_, Arc<SkillStore>>) -> Result<Option<ScenarioDto>, String> {
+pub async fn get_active_scenario(store: State<'_, Arc<SkillStore>>) -> Result<Option<ScenarioDto>, AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let active_id = store
             .get_active_scenario_id()
-            .map_err(|e| e.to_string())?;
+            .map_err(AppError::db)?;
 
         if let Some(id) = active_id {
-            let scenarios = store.get_all_scenarios().map_err(|e| e.to_string())?;
+            let scenarios = store.get_all_scenarios().map_err(AppError::db)?;
             if let Some(s) = scenarios.into_iter().find(|s| s.id == id) {
                 let count = store.count_skills_for_scenario(&s.id).unwrap_or(0);
                 return Ok(Some(ScenarioDto {
@@ -73,8 +73,7 @@ pub async fn get_active_scenario(store: State<'_, Arc<SkillStore>>) -> Result<Op
         }
         Ok(None)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
@@ -83,12 +82,12 @@ pub async fn create_scenario(
     description: Option<String>,
     icon: Option<String>,
     store: State<'_, Arc<SkillStore>>,
-) -> Result<ScenarioDto, String> {
+) -> Result<ScenarioDto, AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let now = chrono::Utc::now().timestamp_millis();
         let id = uuid::Uuid::new_v4().to_string();
-        let previous_active_id = store.get_active_scenario_id().map_err(|e| e.to_string())?;
+        let previous_active_id = store.get_active_scenario_id().map_err(AppError::db)?;
 
         let record = ScenarioRecord {
             id: id.clone(),
@@ -102,12 +101,12 @@ pub async fn create_scenario(
 
         store
             .insert_scenario(&record)
-            .map_err(|e| e.to_string())?;
+            .map_err(AppError::db)?;
 
         if let Some(previous_id) = previous_active_id.as_deref() {
             unsync_scenario_skills(&store, previous_id)?;
         }
-        store.set_active_scenario(&id).map_err(|e| e.to_string())?;
+        store.set_active_scenario(&id).map_err(AppError::db)?;
 
         Ok(ScenarioDto {
             id,
@@ -120,8 +119,7 @@ pub async fn create_scenario(
             updated_at: now,
         })
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
@@ -131,24 +129,23 @@ pub async fn update_scenario(
     description: Option<String>,
     icon: Option<String>,
     store: State<'_, Arc<SkillStore>>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         store
             .update_scenario(&id, &name, description.as_deref(), icon.as_deref())
-            .map_err(|e| e.to_string())
+            .map_err(AppError::db)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
-pub async fn delete_scenario(id: String, store: State<'_, Arc<SkillStore>>) -> Result<(), String> {
+pub async fn delete_scenario(id: String, store: State<'_, Arc<SkillStore>>) -> Result<(), AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let was_active = store
             .get_active_scenario_id()
-            .map_err(|e| e.to_string())?
+            .map_err(AppError::db)?
             .as_deref()
             == Some(id.as_str());
 
@@ -156,26 +153,25 @@ pub async fn delete_scenario(id: String, store: State<'_, Arc<SkillStore>>) -> R
             unsync_scenario_skills(&store, &id)?;
         }
 
-        store.delete_scenario(&id).map_err(|e| e.to_string())?;
+        store.delete_scenario(&id).map_err(AppError::db)?;
 
         if was_active {
-            let remaining = store.get_all_scenarios().map_err(|e| e.to_string())?;
+            let remaining = store.get_all_scenarios().map_err(AppError::db)?;
             if let Some(first) = remaining.first() {
                 store
                     .set_active_scenario(&first.id)
-                    .map_err(|e| e.to_string())?;
+                    .map_err(AppError::db)?;
                 sync_scenario_skills(&store, &first.id)?;
             }
         }
 
         Ok(())
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
-pub async fn switch_scenario(id: String, store: State<'_, Arc<SkillStore>>) -> Result<(), String> {
+pub async fn switch_scenario(id: String, store: State<'_, Arc<SkillStore>>) -> Result<(), AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         // Unsync old scenario skills
@@ -188,15 +184,14 @@ pub async fn switch_scenario(id: String, store: State<'_, Arc<SkillStore>>) -> R
         // Set new active
         store
             .set_active_scenario(&id)
-            .map_err(|e| e.to_string())?;
+            .map_err(AppError::db)?;
 
         // Sync new scenario skills
         sync_scenario_skills(&store, &id)?;
 
         Ok(())
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
@@ -204,19 +199,19 @@ pub async fn add_skill_to_scenario(
     skill_id: String,
     scenario_id: String,
     store: State<'_, Arc<SkillStore>>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         store
             .add_skill_to_scenario(&scenario_id, &skill_id)
-            .map_err(|e| e.to_string())?;
+            .map_err(AppError::db)?;
 
         // If this is the active scenario, sync the skill
         if let Ok(Some(active_id)) = store.get_active_scenario_id() {
             if active_id == scenario_id {
                 // Sync to all installed tools
                 let adapters = tool_adapters::default_tool_adapters();
-                let configured_mode = store.get_setting("sync_mode").map_err(|e| e.to_string())?;
+                let configured_mode = store.get_setting("sync_mode").map_err(AppError::db)?;
                 if let Ok(Some(skill)) = store.get_skill_by_id(&skill_id) {
                     let source = PathBuf::from(&skill.central_path);
                     for adapter in &adapters {
@@ -245,8 +240,7 @@ pub async fn add_skill_to_scenario(
 
         Ok(())
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
@@ -254,12 +248,12 @@ pub async fn remove_skill_from_scenario(
     skill_id: String,
     scenario_id: String,
     store: State<'_, Arc<SkillStore>>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         store
             .remove_skill_from_scenario(&scenario_id, &skill_id)
-            .map_err(|e| e.to_string())?;
+            .map_err(AppError::db)?;
 
         // If this is the active scenario, unsync the skill
         if let Ok(Some(active_id)) = store.get_active_scenario_id() {
@@ -287,33 +281,31 @@ pub async fn remove_skill_from_scenario(
 
         Ok(())
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
 pub async fn reorder_scenarios(
     ids: Vec<String>,
     store: State<'_, Arc<SkillStore>>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         store
             .reorder_scenarios(&ids)
-            .map_err(|e| e.to_string())
+            .map_err(AppError::db)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 // ── Internal helpers ──
 
-pub(crate) fn sync_scenario_skills(store: &SkillStore, scenario_id: &str) -> Result<(), String> {
+pub(crate) fn sync_scenario_skills(store: &SkillStore, scenario_id: &str) -> Result<(), AppError> {
     let skills = store
         .get_skills_for_scenario(scenario_id)
-        .map_err(|e| e.to_string())?;
+        .map_err(AppError::db)?;
     let adapters = tool_adapters::default_tool_adapters();
-    let configured_mode = store.get_setting("sync_mode").map_err(|e| e.to_string())?;
+    let configured_mode = store.get_setting("sync_mode").map_err(AppError::db)?;
 
     for skill in &skills {
         let source = PathBuf::from(&skill.central_path);
@@ -343,10 +335,10 @@ pub(crate) fn sync_scenario_skills(store: &SkillStore, scenario_id: &str) -> Res
     Ok(())
 }
 
-pub(crate) fn unsync_scenario_skills(store: &SkillStore, scenario_id: &str) -> Result<(), String> {
+pub(crate) fn unsync_scenario_skills(store: &SkillStore, scenario_id: &str) -> Result<(), AppError> {
     let skill_ids = store
         .get_skill_ids_for_scenario(scenario_id)
-        .map_err(|e| e.to_string())?;
+        .map_err(AppError::db)?;
 
     for skill_id in &skill_ids {
         let targets = store
