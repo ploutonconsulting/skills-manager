@@ -618,6 +618,14 @@ export function InstallSkills() {
     });
   }, [filteredOverflowSources.length]);
 
+  // Scroll the focused overflow item into view whenever the index changes
+  useEffect(() => {
+    if (sourceFocusedIndex < 0) return;
+    sourceListRef.current
+      ?.children[sourceFocusedIndex]
+      ?.scrollIntoView({ block: "nearest" });
+  }, [sourceFocusedIndex]);
+
   return (
     <div className="app-page">
       <div className="app-page-header">
@@ -832,27 +840,15 @@ export function InstallSkills() {
                                       if (e.key === "ArrowDown") {
                                         e.preventDefault();
                                         if (filteredOverflowSources.length === 0) return;
-                                        setSourceFocusedIndex((i) => {
-                                          const next = Math.min(i + 1, filteredOverflowSources.length - 1);
-                                          requestAnimationFrame(() => {
-                                            sourceListRef.current
-                                              ?.children[next]
-                                              ?.scrollIntoView({ block: "nearest" });
-                                          });
-                                          return next;
-                                        });
+                                        setSourceFocusedIndex((i) =>
+                                          Math.min(i + 1, filteredOverflowSources.length - 1)
+                                        );
                                       } else if (e.key === "ArrowUp") {
                                         e.preventDefault();
                                         if (filteredOverflowSources.length === 0) return;
-                                        setSourceFocusedIndex((i) => {
-                                          const next = i <= 0 ? 0 : i - 1;
-                                          requestAnimationFrame(() => {
-                                            sourceListRef.current
-                                              ?.children[next]
-                                              ?.scrollIntoView({ block: "nearest" });
-                                          });
-                                          return next;
-                                        });
+                                        setSourceFocusedIndex((i) =>
+                                          i <= 0 ? 0 : i - 1
+                                        );
                                       } else if (e.key === "Enter" && sourceFocusedIndex >= 0) {
                                         const target = filteredOverflowSources[sourceFocusedIndex];
                                         if (target) {
@@ -862,7 +858,7 @@ export function InstallSkills() {
                                       } else if (e.key === "Escape") {
                                         resetSourceOverflowState();
                                       }
-                                    }
+                                    }}
                                     placeholder={t("common.search")}
                                     className="app-input w-full bg-background py-1 pl-6 pr-2 text-[12px]"
                                     autoFocus
