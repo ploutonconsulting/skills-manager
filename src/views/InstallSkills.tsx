@@ -74,7 +74,7 @@ export function InstallSkills() {
   const [sourceSearch, setSourceSearch] = useState("");
   const [sourceFocusedIndex, setSourceFocusedIndex] = useState(-1);
   const sourceListRef = useRef<HTMLDivElement | null>(null);
-  const [visibleSourceCount, setVisibleSourceCount] = useState<number>(0);
+  const [visibleSourceCount, setVisibleSourceCount] = useState<number>(Infinity);
   const sourceOverflowBtnRef = useRef<HTMLButtonElement | null>(null);
   const sourceOverflowPanelRef = useRef<HTMLDivElement | null>(null);
   const filterContainerRef = useRef<HTMLDivElement | null>(null);
@@ -85,6 +85,11 @@ export function InstallSkills() {
   const marketSkillsLengthRef = useRef(0);
   const [debouncedMarketQuery, setDebouncedMarketQuery] = useState("");
   const deferredMarketQuery = useDeferredValue(marketQuery);
+  const resetSourceOverflowState = useCallback(() => {
+    setSourceOverflowOpen(false);
+    setSourceSearch("");
+    setSourceFocusedIndex(-1);
+  }, []);
 
   const pruneMarketSearchCache = useCallback(() => {
     const now = Date.now();
@@ -137,13 +142,11 @@ export function InstallSkills() {
         sourceOverflowBtnRef.current?.contains(e.target as Node) ||
         sourceOverflowPanelRef.current?.contains(e.target as Node)
       ) return;
-      setSourceOverflowOpen(false);
-      setSourceSearch("");
-      setSourceFocusedIndex(-1);
+      resetSourceOverflowState();
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [sourceOverflowOpen]);
+  }, [resetSourceOverflowState, sourceOverflowOpen]);
 
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -519,6 +522,11 @@ export function InstallSkills() {
     [marketSkills]
   );
 
+  // Trim stale measurement refs when sourceOptions shrinks
+  useEffect(() => {
+    sourceMeasureRefs.current.length = sourceOptions.length;
+  }, [sourceOptions.length]);
+
   const computeVisibleCount = useCallback(() => {
     const container = filterContainerRef.current;
     if (!container || sourceOptions.length === 0) {
@@ -534,6 +542,7 @@ export function InstallSkills() {
     const totalNeeded = widths.reduce((sum, w) => sum + w + GAP, 0);
     if (totalNeeded <= available) {
       setVisibleSourceCount(sourceOptions.length);
+      resetSourceOverflowState();
       return;
     }
     const availableWithMore = available - moreBtnWidth - GAP;
@@ -548,7 +557,7 @@ export function InstallSkills() {
       }
     }
     setVisibleSourceCount(count);
-  }, [sourceOptions]);
+  }, [resetSourceOverflowState, sourceOptions]);
 
   useLayoutEffect(() => {
     computeVisibleCount();
@@ -561,6 +570,7 @@ export function InstallSkills() {
     observer.observe(container);
     return () => observer.disconnect();
   }, [computeVisibleCount]);
+
   const filteredMarketSkills = useMemo(() => {
     const filtered = marketSourceFilter === "all"
       ? marketSkills
@@ -588,6 +598,25 @@ export function InstallSkills() {
   const hasMarketQuery = debouncedMarketQuery.trim().length > 0;
   const canLoadMoreSearch = hasMarketQuery && marketSkills.length >= marketSearchLimit;
   const isLoadingMoreSearch = hasMarketQuery && marketLoadingMore;
+
+  const overflowSources = sourceOptions.slice(visibleSourceCount);
+  const filteredOverflowSources = sourceSearch
+    ? overflowSources.filter((s) => s.toLowerCase().includes(sourceSearch.toLowerCase()))
+    : overflowSources;
+
+  useEffect(() => {
+    if (sourceOverflowOpen && visibleSourceCount >= sourceOptions.length) {
+      resetSourceOverflowState();
+    }
+  }, [resetSourceOverflowState, sourceOptions.length, sourceOverflowOpen, visibleSourceCount]);
+
+  useEffect(() => {
+    setSourceFocusedIndex((idx) => {
+      if (filteredOverflowSources.length === 0) return -1;
+      if (idx < 0) return idx;
+      return Math.min(idx, filteredOverflowSources.length - 1);
+    });
+  }, [filteredOverflowSources.length]);
 
   return (
     <div className="app-page">
@@ -760,7 +789,13 @@ export function InstallSkills() {
                                 const rect = sourceOverflowBtnRef.current.getBoundingClientRect();
                                 setSourceOverflowSide(rect.left + 192 > window.innerWidth ? "right" : "left");
                               }
-                              setSourceOverflowOpen((v) => !v);
+                              setSourceOverflowOpen((v) => {
+                                if (v) {
+                                  setSourceSearch("");
+                                  setSourceFocusedIndex(-1);
+                                }
+                                return !v;
+                              });
                             }}
                             className={cn(
                               "flex items-center rounded-full border px-2 py-1 text-[13px] font-medium transition-colors",
@@ -769,12 +804,15 @@ export function InstallSkills() {
                                 : "border-border-subtle bg-background text-muted hover:text-secondary"
                             )}
                             title={`${sourceOptions.length - visibleSourceCount} more`}
+                            aria-expanded={sourceOverflowOpen}
+                            aria-haspopup="listbox"
                           >
                             <MoreHorizontal className="h-3.5 w-3.5" />
                           </button>
                           {sourceOverflowOpen && (
                             <div
                               ref={sourceOverflowPanelRef}
+                              role="listbox"
                               className={cn(
                                 "absolute top-full z-50 mt-1.5 w-48 overflow-hidden rounded-xl border border-border bg-surface shadow-lg",
                                 sourceOverflowSide === "left" ? "left-0" : "right-0"
@@ -791,13 +829,11 @@ export function InstallSkills() {
                                       setSourceFocusedIndex(-1);
                                     }}
                                     onKeyDown={(e) => {
-                                      const filtered = sourceOptions.filter((s) =>
-                                        s.toLowerCase().includes(sourceSearch.toLowerCase())
-                                      );
                                       if (e.key === "ArrowDown") {
                                         e.preventDefault();
+                                        if (filteredOverflowSources.length === 0) return;
                                         setSourceFocusedIndex((i) => {
-                                          const next = Math.min(i + 1, filtered.length - 1);
+                                          const next = Math.min(i + 1, filteredOverflowSources.length - 1);
                                           requestAnimationFrame(() => {
                                             sourceListRef.current
                                               ?.children[next]
@@ -807,8 +843,9 @@ export function InstallSkills() {
                                         });
                                       } else if (e.key === "ArrowUp") {
                                         e.preventDefault();
+                                        if (filteredOverflowSources.length === 0) return;
                                         setSourceFocusedIndex((i) => {
-                                          const next = Math.max(i - 1, 0);
+                                          const next = i <= 0 ? 0 : i - 1;
                                           requestAnimationFrame(() => {
                                             sourceListRef.current
                                               ?.children[next]
@@ -817,17 +854,13 @@ export function InstallSkills() {
                                           return next;
                                         });
                                       } else if (e.key === "Enter") {
-                                        const target = filtered[sourceFocusedIndex] ?? filtered[0];
+                                        const target = filteredOverflowSources[sourceFocusedIndex] ?? filteredOverflowSources[0];
                                         if (target) {
                                           setMarketSourceFilter(target);
-                                          setSourceOverflowOpen(false);
-                                          setSourceSearch("");
-                                          setSourceFocusedIndex(-1);
+                                          resetSourceOverflowState();
                                         }
                                       } else if (e.key === "Escape") {
-                                        setSourceOverflowOpen(false);
-                                        setSourceSearch("");
-                                        setSourceFocusedIndex(-1);
+                                        resetSourceOverflowState();
                                       }
                                     }}
                                     placeholder={t("common.search")}
@@ -840,17 +873,15 @@ export function InstallSkills() {
                                 </div>
                               </div>
                               <div ref={sourceListRef} className="max-h-48 overflow-y-auto scrollbar-hide py-1">
-                                {sourceOptions.filter((s) =>
-                                  s.toLowerCase().includes(sourceSearch.toLowerCase())
-                                ).map((source, idx) => (
+                                {filteredOverflowSources.map((source, idx) => (
                                   <button
                                     key={source}
                                     type="button"
+                                    role="option"
+                                    aria-selected={marketSourceFilter === source}
                                     onClick={() => {
                                       setMarketSourceFilter(source);
-                                      setSourceOverflowOpen(false);
-                                      setSourceSearch("");
-                                      setSourceFocusedIndex(-1);
+                                      resetSourceOverflowState();
                                     }}
                                     className={cn(
                                       "flex w-full items-center px-3 py-1.5 text-left text-[13px] transition-colors",
