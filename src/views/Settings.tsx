@@ -17,6 +17,7 @@ import {
   BookOpen,
   Download,
   Type,
+  Key,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -52,6 +53,8 @@ export function Settings() {
   const [proxyInput, setProxyInput] = useState("");
   const [proxySaving, setProxySaving] = useState(false);
   const [textSize, setTextSize] = useState("default");
+  const [skillsmpApiKey, setSkillsmpApiKey] = useState("");
+  const [skillsmpSaving, setSkillsmpSaving] = useState(false);
   const GITHUB_URL = "https://github.com/xingkongliang/skills-manager";
 
   useEffect(() => {
@@ -64,6 +67,7 @@ export function Settings() {
       setShowTrayIcon(!(normalized === "false" || normalized === "0" || normalized === "no" || normalized === "off"));
     });
     api.getSettings("text_size").then((v) => { if (v) { setTextSize(v); applyTextSize(v); } });
+    api.getSettings("skillsmp_api_key").then((v) => { if (v) setSkillsmpApiKey(v); });
     api.getCentralRepoPath().then(setCentralRepoPath).catch(() => {});
 
     (async () => {
@@ -224,6 +228,18 @@ export function Settings() {
       }
     } finally {
       setInstalling(false);
+    }
+  };
+
+  const handleSaveSkillsmpApiKey = async () => {
+    setSkillsmpSaving(true);
+    try {
+      await api.setSettings("skillsmp_api_key", skillsmpApiKey.trim());
+      toast.success(t("common.success"));
+    } catch {
+      toast.error(t("common.error"));
+    } finally {
+      setSkillsmpSaving(false);
     }
   };
 
@@ -599,6 +615,50 @@ export function Settings() {
                     <Loader2 className="w-3 h-3 animate-spin" />
                   ) : (
                     <LinkIcon className="w-3 h-3" />
+                  )}
+                  {t("common.save")}
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* SkillsMP API Key */}
+        <section>
+          <h2 className="app-section-title mb-3">
+            SkillsMP AI Search
+          </h2>
+          <div className="app-panel overflow-hidden divide-y divide-border-subtle">
+            <div className="px-4 py-3">
+              <h3 className="text-[13px] text-secondary font-medium mb-0.5">API Key</h3>
+              <p className="text-[13px] text-muted mb-2">
+                {t("settings.skillsmpDesc", { defaultValue: "Enter your SkillsMP API key to enable AI-powered skill search." })}{" "}
+                <button
+                  type="button"
+                  onClick={() => openUrl("https://skillsmp.com/docs/api")}
+                  className="inline-flex items-center gap-0.5 text-accent-light hover:underline"
+                >
+                  {t("settings.skillsmpGetKey", { defaultValue: "Get your API key" })}
+                  <ExternalLink className="h-3 w-3" />
+                </button>
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="password"
+                  value={skillsmpApiKey}
+                  onChange={(e) => setSkillsmpApiKey(e.target.value)}
+                  placeholder="sk_live_..."
+                  className={`${fieldClass} flex-1 font-mono`}
+                />
+                <button
+                  onClick={handleSaveSkillsmpApiKey}
+                  disabled={skillsmpSaving}
+                  className={`${actionButtonClass} bg-surface-hover hover:bg-surface-active text-tertiary border-border`}
+                >
+                  {skillsmpSaving ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Key className="w-3 h-3" />
                   )}
                   {t("common.save")}
                 </button>

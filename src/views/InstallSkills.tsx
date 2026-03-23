@@ -48,7 +48,7 @@ export function InstallSkills() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<"market" | "local" | "git">("market");
-  const [marketTab, setMarketTab] = useState<"hot" | "trending" | "alltime">("hot");
+  const [marketTab, setMarketTab] = useState<"hot" | "trending" | "alltime">("alltime");
   const [marketQuery, setMarketQuery] = useState("");
   const [marketSourceFilter, setMarketSourceFilter] = useState("all");
   const [marketSkills, setMarketSkills] = useState<SkillsShSkill[]>([]);
@@ -72,6 +72,9 @@ export function InstallSkills() {
   const [importingPaths, setImportingPaths] = useState<Set<string>>(new Set());
   const [importingAll, setImportingAll] = useState(false);
   const [renameEditing, setRenameEditing] = useState<Record<string, string>>({});
+  const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set());
+  const [aiSearch, setAiSearch] = useState(false);
+  const [skillsmpApiKey, setSkillsmpApiKey] = useState<string | null>(null);
   const marketListRef = useRef<HTMLDivElement | null>(null);
   const [sourceOverflowOpen, setSourceOverflowOpen] = useState(false);
   const [sourceOverflowSide, setSourceOverflowSide] = useState<"left" | "right">("left");
@@ -179,6 +182,10 @@ export function InstallSkills() {
   }, [resetSourceOverflowState, sourceOverflowOpen]);
 
   useEffect(() => {
+    api.getSettings("skillsmp_api_key").then((v) => setSkillsmpApiKey(v || null));
+  }, []);
+
+  useEffect(() => {
     const tab = searchParams.get("tab");
     if (tab === "market" || tab === "local" || tab === "git") {
       setActiveTab(tab);
@@ -237,7 +244,9 @@ export function InstallSkills() {
 
     let stale = false;
     const request = query
-      ? api.searchSkillssh(query, marketSearchLimit)
+      ? (aiSearch && skillsmpApiKey
+        ? api.searchSkillsmp(query, skillsmpApiKey, true, undefined, marketSearchLimit)
+        : api.searchSkillssh(query, marketSearchLimit))
       : api.fetchLeaderboard(marketTab);
 
     request
@@ -267,7 +276,7 @@ export function InstallSkills() {
       });
 
     return () => { stale = true; };
-  }, [activeTab, debouncedMarketQuery, marketReloadKey, marketSearchLimit, marketTab, pruneMarketSearchCache, t]);
+  }, [activeTab, aiSearch, skillsmpApiKey, debouncedMarketQuery, marketReloadKey, marketSearchLimit, marketTab, pruneMarketSearchCache, t]);
 
   useEffect(() => {
     if (activeTab === "local" && !scanResult && !scanLoading) {
@@ -617,10 +626,59 @@ export function InstallSkills() {
     }
     return filtered;
   }, [marketSkills, marketSourceFilter, debouncedMarketQuery]);
-  const totalMarketPages = Math.max(1, Math.ceil(filteredMarketSkills.length / MARKET_PAGE_SIZE));
+
+  // Group skills by source: show top skill + collapse rest behind "+N more"
+  type MarketEntry =
+    | { type: "skill"; skill: SkillsShSkill }
+    | { type: "collapsed"; source: string; skills: SkillsShSkill[]; totalInstalls: number };
+  const groupedMarketEntries = useMemo<MarketEntry[]>(() => {
+    // When filtering a specific source or searching, show all skills flat
+    if (marketSourceFilter !== "all" || debouncedMarketQuery.trim().length > 0) {
+      return filteredMarketSkills.map((skill) => ({ type: "skill" as const, skill }));
+    }
+    const sourceMap = new Map<string, SkillsShSkill[]>();
+    for (const skill of filteredMarketSkills) {
+      const arr = sourceMap.get(skill.source);
+      if (arr) arr.push(skill);
+      else sourceMap.set(skill.source, [skill]);
+    }
+    const entries: MarketEntry[] = [];
+    const seen = new Set<string>();
+    for (const skill of filteredMarketSkills) {
+      if (seen.has(skill.source)) continue;
+      seen.add(skill.source);
+      const group = sourceMap.get(skill.source)!;
+      entries.push({ type: "skill", skill: group[0] });
+      if (group.length > 1) {
+        const rest = group.slice(1);
+        const totalInstalls = group.reduce((sum, s) => sum + s.installs, 0);
+        entries.push({ type: "collapsed", source: skill.source, skills: rest, totalInstalls });
+      }
+    }
+    return entries;
+  }, [filteredMarketSkills, marketSourceFilter, debouncedMarketQuery]);
+
+  // Expand collapsed entries based on expandedSources
+  const visibleMarketEntries = useMemo<MarketEntry[]>(() => {
+    const result: MarketEntry[] = [];
+    for (const entry of groupedMarketEntries) {
+      if (entry.type === "skill") {
+        result.push(entry);
+      } else if (expandedSources.has(entry.source)) {
+        for (const skill of entry.skills) {
+          result.push({ type: "skill", skill });
+        }
+      } else {
+        result.push(entry);
+      }
+    }
+    return result;
+  }, [groupedMarketEntries, expandedSources]);
+
+  const totalMarketPages = Math.max(1, Math.ceil(visibleMarketEntries.length / MARKET_PAGE_SIZE));
   const currentMarketPage = Math.min(marketPage, totalMarketPages);
   const marketPageStart = (currentMarketPage - 1) * MARKET_PAGE_SIZE;
-  const paginatedMarketSkills = filteredMarketSkills.slice(
+  const paginatedMarketEntries = visibleMarketEntries.slice(
     marketPageStart,
     marketPageStart + MARKET_PAGE_SIZE
   );
@@ -720,16 +778,16 @@ export function InstallSkills() {
                   {!hasMarketQuery ? (
                     <div className="app-segmented shrink-0 bg-background">
                       {[
-                        { id: "hot" as const, label: t("install.hot"), icon: Star },
-                        { id: "trending" as const, label: t("install.trending"), icon: TrendingUp },
                         { id: "alltime" as const, label: t("install.all"), icon: Clock },
+                        { id: "trending" as const, label: t("install.trending"), icon: TrendingUp },
+                        { id: "hot" as const, label: t("install.hot"), icon: Star },
                       ].map((tab) => {
                         const Icon = tab.icon;
                         const isActive = marketTab === tab.id;
                         return (
                           <button
                             key={tab.id}
-                            onClick={() => setMarketTab(tab.id)}
+                            onClick={() => { setMarketTab(tab.id); setExpandedSources(new Set()); }}
                             className={cn(
                               "app-segmented-button flex items-center gap-1.5",
                               isActive && "app-segmented-button-active"
@@ -752,13 +810,39 @@ export function InstallSkills() {
                         setMarketQuery(event.target.value);
                         setMarketSearchLimit(MARKET_SEARCH_STEP);
                       }}
-                      placeholder={t("install.searchMarket")}
+                      placeholder={aiSearch ? t("install.aiSearchPlaceholder", { defaultValue: "AI search — describe what you need..." }) : t("install.searchMarket")}
                       className="app-input w-full bg-background pl-9"
                       autoCapitalize="none"
                       autoCorrect="off"
                       spellCheck={false}
                     />
                   </div>
+                  <button
+                    onClick={() => {
+                      if (skillsmpApiKey) {
+                        setAiSearch((v) => !v);
+                      } else {
+                        toast.info(
+                          t("install.aiSearchNoKey", { defaultValue: "Set your SkillsMP API key in Settings to enable AI search" }),
+                          {
+                            action: {
+                              label: t("common.goToSettings", { defaultValue: "Settings" }),
+                              onClick: () => navigate("/settings"),
+                            },
+                          }
+                        );
+                      }
+                    }}
+                    className={cn(
+                      "shrink-0 rounded-[6px] border px-2.5 py-1.5 text-[13px] font-medium transition-colors",
+                      aiSearch && skillsmpApiKey
+                        ? "border-accent-border bg-accent-dark text-white"
+                        : "border-border-subtle bg-surface text-muted hover:bg-surface-hover"
+                    )}
+                    title={t("install.aiSearchToggle", { defaultValue: "AI-powered search (SkillsMP)" })}
+                  >
+                    AI
+                  </button>
                 </div>
               </div>
 
@@ -976,7 +1060,46 @@ export function InstallSkills() {
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-3">
-                    {paginatedMarketSkills.map((skill) => {
+                    {paginatedMarketEntries.map((entry) => {
+                      if (entry.type === "collapsed") {
+                        const owner = entry.source.split("/")[0];
+                        const avatarUrl = `https://github.com/${owner}.png?size=32`;
+                        const formatCount = (n: number) =>
+                          n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M`
+                            : n >= 1_000 ? `${(n / 1_000).toFixed(1)}K`
+                            : String(n);
+                        return (
+                          <button
+                            key={`collapsed-${entry.source}`}
+                            onClick={() =>
+                              setExpandedSources((prev) => {
+                                const next = new Set(prev);
+                                next.add(entry.source);
+                                return next;
+                              })
+                            }
+                            className="app-panel col-span-2 flex items-center gap-2 p-3 text-left text-[13px] text-muted transition-colors hover:border-border hover:text-secondary lg:col-span-3"
+                          >
+                            <img
+                              src={avatarUrl}
+                              alt={owner}
+                              className="h-5 w-5 shrink-0 rounded-full border border-border-subtle"
+                              loading="lazy"
+                            />
+                            <span>
+                              +{entry.skills.length} more from{" "}
+                              <span className="font-medium text-accent-light">{entry.source}</span>
+                              {marketTab === "alltime" && entry.totalInstalls > 0 && (
+                                <span className="ml-1 text-faint">
+                                  ({formatCount(entry.totalInstalls)} total)
+                                </span>
+                              )}
+                            </span>
+                          </button>
+                        );
+                      }
+
+                      const skill = entry.skill;
                       const displayName = skill.name || skill.skill_id;
                       const showSkillId = skill.skill_id.trim() !== displayName.trim();
                       const owner = skill.source.split("/")[0];
@@ -1051,12 +1174,16 @@ export function InstallSkills() {
                           <span className="rounded-[5px] bg-accent-bg px-1.5 py-0.5 text-[13px] leading-4 font-medium text-accent-light">
                             @{skill.source}
                           </span>
-                          <span className="inline-flex items-center gap-1 rounded-[5px] border border-border-subtle bg-background px-1.5 py-0.5 text-[13px] leading-4 text-muted">
-                            <DownloadCloud className="h-3 w-3" />
-                            {skill.installs > 1000
-                              ? `${(skill.installs / 1000).toFixed(0)}k`
-                              : skill.installs}
-                          </span>
+                          {marketTab === "alltime" && skill.installs > 0 && (
+                            <span className="inline-flex items-center gap-1 rounded-[5px] border border-border-subtle bg-background px-1.5 py-0.5 text-[13px] leading-4 text-muted">
+                              <DownloadCloud className="h-3 w-3" />
+                              {skill.installs >= 1_000_000
+                                ? `${(skill.installs / 1_000_000).toFixed(1)}M`
+                                : skill.installs >= 1_000
+                                  ? `${(skill.installs / 1_000).toFixed(1)}K`
+                                  : skill.installs}
+                            </span>
+                          )}
                           {isInstalled ? (
                             <span className="inline-flex items-center gap-1 rounded-[5px] border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[13px] leading-4 font-medium text-emerald-400">
                               <Check className="h-3 w-3" />

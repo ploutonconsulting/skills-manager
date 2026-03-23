@@ -4,6 +4,7 @@ use tauri::State;
 use crate::core::{
     error::AppError,
     skill_store::SkillStore,
+    skillsmp_api,
     skillssh_api::{self, LeaderboardType, SkillsShSkill},
 };
 
@@ -50,6 +51,25 @@ pub async fn search_skillssh(
     tauri::async_runtime::spawn_blocking(move || {
         skillssh_api::search_skills(&query, bounded, proxy_url.as_deref())
             .map_err(AppError::network)
+    })
+    .await?
+}
+
+#[tauri::command]
+pub async fn search_skillsmp(
+    query: String,
+    api_key: String,
+    ai: Option<bool>,
+    page: Option<u32>,
+    limit: Option<u32>,
+) -> Result<Vec<SkillsShSkill>, AppError> {
+    let mode = if ai.unwrap_or(false) {
+        skillsmp_api::SearchMode::Ai
+    } else {
+        skillsmp_api::SearchMode::Keyword
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        skillsmp_api::search(&api_key, &query, mode, page, limit).map_err(AppError::network)
     })
     .await?
 }
