@@ -114,6 +114,11 @@
     "agentCount": "{{count}} 个 Agent",
     "ready": "已就绪",
     "standby": "待启用",
+    "agentTogglesTitle": "Agent 开关",
+    "agentToggleEnabled": "{{agent}} 已开启",
+    "agentToggleDisabled": "{{agent}} 已关闭",
+    "agentToggleNotInstalled": "未安装",
+    "agentToggleDisabledGlobally": "已在设置中禁用",
     "updateStatus": {
       "unknown": "未知",
       "checking": "检查中",

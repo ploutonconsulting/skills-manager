@@ -30,7 +30,13 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { SkillDetailPanel } from "../components/SkillDetailPanel";
 import { MultiSelectToolbar } from "../components/MultiSelectToolbar";
 import * as api from "../lib/tauri";
-import type { ManagedSkill, ToolInfo, GitBackupStatus, GitBackupVersion } from "../lib/tauri";
+import type {
+  ManagedSkill,
+  ToolInfo,
+  GitBackupStatus,
+  GitBackupVersion,
+  SkillToolToggle,
+} from "../lib/tauri";
 import { getErrorMessage, getErrorKind } from "../lib/error";
 
 function getToolDisplayName(toolKey: string, tools: ToolInfo[]) {
@@ -67,10 +73,11 @@ export function MySkills() {
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<ManagedSkill | null>(null);
   const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
-  const [syncingSkillId, setSyncingSkillId] = useState<string | null>(null);
   const [checkingAll, setCheckingAll] = useState(false);
   const [checkingSkillId, setCheckingSkillId] = useState<string | null>(null);
   const [updatingSkillId, setUpdatingSkillId] = useState<string | null>(null);
+  const [toolToggles, setToolToggles] = useState<SkillToolToggle[] | null>(null);
+  const [togglingToolKey, setTogglingToolKey] = useState<string | null>(null);
   const [gitStatus, setGitStatus] = useState<GitBackupStatus | null>(null);
   const [gitLoading, setGitLoading] = useState<string | null>(null); // "start" | "sync"
   const [gitRemoteConfig, setGitRemoteConfig] = useState("");
@@ -83,7 +90,6 @@ export function MySkills() {
   const [tagInput, setTagInput] = useState("");
   const tagInputRef = useRef<HTMLInputElement>(null);
 
-  const installedTools = tools.filter((tool) => tool.installed && tool.enabled);
   const activeScenarioName = activeScenario?.name || t("mySkills.currentScenarioFallback");
 
   const refreshAllTags = async () => {
@@ -270,59 +276,49 @@ export function MySkills() {
     }
   }, [gitVersionsOpen, gitStatus?.is_repo, refreshGitVersions]);
 
-  const getSyncMeta = (skill: ManagedSkill) => {
-    const syncedToolKeys = skill.targets
-      .map((target) => target.tool)
-      .filter((toolKey, index, values) => values.indexOf(toolKey) === index);
-    const syncedToolLabels = syncedToolKeys.map((toolKey) => getToolDisplayName(toolKey, tools));
-    const pendingTools = installedTools.filter((tool) => !syncedToolKeys.includes(tool.key));
-
-    return {
-      syncedToolKeys,
-      syncedToolLabels,
-      pendingToolKeys: pendingTools.map((tool) => tool.key),
-      pendingToolLabels: pendingTools.map((tool) => tool.display_name),
-    };
-  };
-
-  const handleSyncAction = async (skill: ManagedSkill, mode: "sync" | "unsync") => {
-    const syncMeta = getSyncMeta(skill);
-    const toolKeys = mode === "sync" ? syncMeta.pendingToolKeys : syncMeta.syncedToolKeys;
-
-    if (toolKeys.length === 0) {
-      toast.message(
-        mode === "sync" ? t("mySkills.syncNothingToDo") : t("mySkills.unsyncNothingToDo")
-      );
-      return;
-    }
-    
-    setSyncingSkillId(skill.id);
-    try {
-      for (const toolKey of toolKeys) {
-        if (mode === "sync") {
-          await api.syncSkillToTool(skill.id, toolKey);
-        } else {
-          await api.unsyncSkillFromTool(skill.id, toolKey);
-        }
+  useEffect(() => {
+    let cancelled = false;
+    const loadToggles = async () => {
+      if (!selectedSkill || !activeScenario) {
+        setToolToggles(null);
+        return;
       }
+      if (!selectedSkill.scenario_ids.includes(activeScenario.id)) {
+        setToolToggles(null);
+        return;
+      }
+      try {
+        const toggles = await api.getSkillToolToggles(selectedSkill.id, activeScenario.id);
+        if (!cancelled) setToolToggles(toggles);
+      } catch {
+        if (!cancelled) setToolToggles(null);
+      }
+    };
+    loadToggles();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSkill?.id, activeScenario?.id, tools]);
 
+  const handleToggleSkillTool = async (toolKey: string, enabled: boolean) => {
+    if (!selectedSkill || !activeScenario) return;
+    setTogglingToolKey(toolKey);
+    try {
+      await api.setSkillToolToggle(selectedSkill.id, activeScenario.id, toolKey, enabled);
+      const displayName = getToolDisplayName(toolKey, tools);
       toast.success(
-        mode === "sync"
-          ? t("mySkills.syncCompleted", {
-              name: skill.name,
-              count: toolKeys.length,
-            })
-          : t("mySkills.unsyncCompleted", {
-              name: skill.name,
-              count: toolKeys.length,
-            })
+        enabled
+          ? t("mySkills.agentToggleEnabled", { agent: displayName })
+          : t("mySkills.agentToggleDisabled", { agent: displayName })
       );
       await refreshManagedSkills();
+      const toggles = await api.getSkillToolToggles(selectedSkill.id, activeScenario.id);
+      setToolToggles(toggles);
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, t("common.error")));
       await refreshManagedSkills();
     } finally {
-      setSyncingSkillId(null);
+      setTogglingToolKey(null);
     }
   };
 
@@ -1241,9 +1237,9 @@ export function MySkills() {
       <SkillDetailPanel
         skill={selectedSkill}
         onClose={closeSkillDetail}
-        syncMeta={selectedSkill ? getSyncMeta(selectedSkill) : null}
-        syncing={selectedSkill ? syncingSkillId === selectedSkill.id : false}
-        onSync={(mode) => selectedSkill && handleSyncAction(selectedSkill, mode)}
+        toolToggles={toolToggles}
+        togglingTool={togglingToolKey}
+        onToggleTool={handleToggleSkillTool}
       />
 
       <ConfirmDialog

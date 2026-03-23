@@ -8,7 +8,7 @@ use crate::core::skill_store::{SkillStore, SkillTargetRecord};
 use crate::core::sync_engine;
 use crate::core::tool_adapters;
 
-use super::scenarios::sync_scenario_skills;
+use super::scenarios::{enabled_installed_adapters_for_scenario_skill, sync_scenario_skills};
 
 #[derive(Debug, Serialize)]
 pub struct ToolInfoDto {
@@ -52,6 +52,17 @@ fn sync_active_scenario_to_tool(store: &SkillStore, tool_key: &str) {
     };
     let configured_mode = store.get_setting("sync_mode").ok().flatten();
     for skill in &skills {
+        let allowed_adapters =
+            match enabled_installed_adapters_for_scenario_skill(store, &active_id, &skill.id) {
+                Ok(adapters) => adapters,
+                Err(_) => continue,
+            };
+        if !allowed_adapters
+            .iter()
+            .any(|adapter| adapter.key == tool_key)
+        {
+            continue;
+        }
         let source = PathBuf::from(&skill.central_path);
         let target = adapter.skills_dir().join(&skill.name);
         let mode = sync_engine::sync_mode_for_tool(&adapter.key, configured_mode.as_deref());

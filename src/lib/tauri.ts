@@ -41,6 +41,14 @@ export interface SkillTarget {
   synced_at: number | null;
 }
 
+export interface SkillToolToggle {
+  tool: string;
+  display_name: string;
+  installed: boolean;
+  globally_enabled: boolean;
+  enabled: boolean;
+}
+
 export interface SkillDocument {
   skill_id: string;
   filename: string;
@@ -209,6 +217,17 @@ export const syncSkillToTool = (skillId: string, tool: string) =>
 
 export const unsyncSkillFromTool = (skillId: string, tool: string) =>
   invoke<void>("unsync_skill_from_tool", { skillId, tool });
+
+export const getSkillToolToggles = (skillId: string, scenarioId: string) =>
+  invoke<SkillToolToggle[]>("get_skill_tool_toggles", { skillId, scenarioId });
+
+export const setSkillToolToggle = (
+  skillId: string,
+  scenarioId: string,
+  tool: string,
+  enabled: boolean
+) =>
+  invoke<void>("set_skill_tool_toggle", { skillId, scenarioId, tool, enabled });
 
 // ── Scan ──
 

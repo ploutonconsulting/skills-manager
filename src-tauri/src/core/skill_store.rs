@@ -81,6 +81,15 @@ pub struct ProjectRecord {
     pub updated_at: i64,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct ScenarioSkillToolToggleRecord {
+    pub scenario_id: String,
+    pub skill_id: String,
+    pub tool: String,
+    pub enabled: bool,
+    pub updated_at: i64,
+}
+
 impl SkillStore {
     pub fn new(db_path: &PathBuf) -> Result<Self> {
         let conn = Connection::open(db_path)?;
@@ -665,6 +674,92 @@ impl SkillStore {
         let mut stmt =
             conn.prepare("SELECT scenario_id FROM scenario_skills WHERE skill_id = ?1")?;
         let rows = stmt.query_map(params![skill_id], |row| row.get::<_, String>(0))?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    pub fn ensure_scenario_skill_tool_defaults(
+        &self,
+        scenario_id: &str,
+        skill_id: &str,
+        tools: &[String],
+    ) -> Result<()> {
+        if tools.is_empty() {
+            return Ok(());
+        }
+
+        let conn = self.conn.lock().unwrap();
+        let tx = conn.unchecked_transaction()?;
+        let now = chrono::Utc::now().timestamp_millis();
+
+        for tool in tools {
+            tx.execute(
+                "INSERT OR IGNORE INTO scenario_skill_tools (scenario_id, skill_id, tool, enabled, updated_at)
+                 VALUES (?1, ?2, ?3, 1, ?4)",
+                params![scenario_id, skill_id, tool, now],
+            )?;
+        }
+
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn set_scenario_skill_tool_enabled(
+        &self,
+        scenario_id: &str,
+        skill_id: &str,
+        tool: &str,
+        enabled: bool,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = chrono::Utc::now().timestamp_millis();
+        conn.execute(
+            "INSERT INTO scenario_skill_tools (scenario_id, skill_id, tool, enabled, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(scenario_id, skill_id, tool)
+             DO UPDATE SET enabled = excluded.enabled, updated_at = excluded.updated_at",
+            params![scenario_id, skill_id, tool, enabled, now],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_scenario_skill_tool_toggles(
+        &self,
+        scenario_id: &str,
+        skill_id: &str,
+    ) -> Result<Vec<ScenarioSkillToolToggleRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT scenario_id, skill_id, tool, enabled, updated_at
+             FROM scenario_skill_tools
+             WHERE scenario_id = ?1 AND skill_id = ?2
+             ORDER BY tool",
+        )?;
+        let rows = stmt.query_map(params![scenario_id, skill_id], |row| {
+            Ok(ScenarioSkillToolToggleRecord {
+                scenario_id: row.get(0)?,
+                skill_id: row.get(1)?,
+                tool: row.get(2)?,
+                enabled: row.get(3)?,
+                updated_at: row.get(4)?,
+            })
+        })?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    pub fn get_enabled_tools_for_scenario_skill(
+        &self,
+        scenario_id: &str,
+        skill_id: &str,
+    ) -> Result<Vec<String>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT tool
+             FROM scenario_skill_tools
+             WHERE scenario_id = ?1 AND skill_id = ?2 AND enabled = 1",
+        )?;
+        let rows = stmt.query_map(params![scenario_id, skill_id], |row| {
+            row.get::<_, String>(0)
+        })?;
         Ok(rows.filter_map(|r| r.ok()).collect())
     }
 

@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use rusqlite::Connection;
 
 /// Current schema version. Bump this when adding a new migration.
-const LATEST_VERSION: u32 = 1;
+const LATEST_VERSION: u32 = 2;
 
 /// Run all pending migrations on the database.
 ///
@@ -48,6 +48,7 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
 fn migrate_step(conn: &Connection, from_version: u32) -> Result<()> {
     match from_version {
         0 => migrate_v0_to_v1(conn),
+        1 => migrate_v1_to_v2(conn),
         _ => unreachable!("unknown migration version: {from_version}"),
     }
 }
@@ -134,6 +135,15 @@ fn migrate_v0_to_v1(conn: &Connection) -> Result<()> {
             PRIMARY KEY(scenario_id, skill_id)
         );
 
+        CREATE TABLE IF NOT EXISTS scenario_skill_tools (
+            scenario_id TEXT NOT NULL REFERENCES scenarios(id) ON DELETE CASCADE,
+            skill_id TEXT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+            tool TEXT NOT NULL,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            updated_at INTEGER NOT NULL,
+            PRIMARY KEY(scenario_id, skill_id, tool)
+        );
+
         CREATE TABLE IF NOT EXISTS active_scenario (
             key TEXT PRIMARY KEY DEFAULT 'current',
             scenario_id TEXT REFERENCES scenarios(id) ON DELETE SET NULL
@@ -168,6 +178,23 @@ fn migrate_v0_to_v1(conn: &Connection) -> Result<()> {
     add_column_if_missing(conn, "skills", "last_checked_at", "INTEGER")?;
     add_column_if_missing(conn, "skills", "last_check_error", "TEXT")?;
 
+    Ok(())
+}
+
+/// v1 → v2: Add per-scenario, per-skill tool toggle table.
+fn migrate_v1_to_v2(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS scenario_skill_tools (
+            scenario_id TEXT NOT NULL REFERENCES scenarios(id) ON DELETE CASCADE,
+            skill_id TEXT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+            tool TEXT NOT NULL,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            updated_at INTEGER NOT NULL,
+            PRIMARY KEY(scenario_id, skill_id, tool)
+        );
+        ",
+    )?;
     Ok(())
 }
 
@@ -237,6 +264,7 @@ mod tests {
         assert!(tables.contains(&"scenarios".to_string()));
         assert!(tables.contains(&"projects".to_string()));
         assert!(tables.contains(&"skill_tags".to_string()));
+        assert!(tables.contains(&"scenario_skill_tools".to_string()));
     }
 
     #[test]
@@ -300,6 +328,63 @@ mod tests {
         assert!(has_column(&conn, "skills", "last_checked_at").unwrap());
         assert!(has_column(&conn, "skills", "last_check_error").unwrap());
         assert!(has_column(&conn, "scenarios", "icon").unwrap());
+
+        let version: u32 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, LATEST_VERSION);
+    }
+
+    #[test]
+    fn test_v1_database_upgrades_to_v2() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+
+        conn.execute_batch(
+            "
+            CREATE TABLE skills (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT,
+                source_type TEXT NOT NULL,
+                source_ref TEXT,
+                source_ref_resolved TEXT,
+                source_subpath TEXT,
+                source_branch TEXT,
+                source_revision TEXT,
+                remote_revision TEXT,
+                central_path TEXT NOT NULL UNIQUE,
+                content_hash TEXT,
+                enabled INTEGER DEFAULT 1,
+                created_at INTEGER,
+                updated_at INTEGER,
+                status TEXT DEFAULT 'ok',
+                update_status TEXT DEFAULT 'unknown',
+                last_checked_at INTEGER,
+                last_check_error TEXT
+            );
+            CREATE TABLE scenarios (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                description TEXT,
+                icon TEXT,
+                sort_order INTEGER DEFAULT 0,
+                created_at INTEGER,
+                updated_at INTEGER
+            );
+            CREATE TABLE scenario_skills (
+                scenario_id TEXT NOT NULL REFERENCES scenarios(id) ON DELETE CASCADE,
+                skill_id TEXT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+                added_at INTEGER,
+                PRIMARY KEY(scenario_id, skill_id)
+            );
+            PRAGMA user_version = 1;
+            ",
+        )
+        .unwrap();
+
+        run_migrations(&conn).unwrap();
+        assert!(has_column(&conn, "scenario_skill_tools", "enabled").unwrap());
 
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |row| row.get(0))

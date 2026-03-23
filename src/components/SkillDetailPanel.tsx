@@ -3,25 +3,29 @@ import { createPortal } from "react-dom";
 import { X, Folder, CheckCircle2, Circle, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../utils";
-import { getSkillDocument, type ManagedSkill, type SkillDocument } from "../lib/tauri";
+import {
+  getSkillDocument,
+  type ManagedSkill,
+  type SkillDocument,
+  type SkillToolToggle,
+} from "../lib/tauri";
 import { SkillMarkdown } from "./SkillMarkdown";
-
-export interface SyncMeta {
-  syncedToolKeys: string[];
-  syncedToolLabels: string[];
-  pendingToolKeys: string[];
-  pendingToolLabels: string[];
-}
 
 interface Props {
   skill: ManagedSkill | null;
   onClose: () => void;
-  syncMeta?: SyncMeta | null;
-  syncing?: boolean;
-  onSync?: (mode: "sync" | "unsync") => void;
+  toolToggles?: SkillToolToggle[] | null;
+  togglingTool?: string | null;
+  onToggleTool?: (tool: string, enabled: boolean) => void;
 }
 
-export function SkillDetailPanel({ skill, onClose, syncMeta, syncing, onSync }: Props) {
+export function SkillDetailPanel({
+  skill,
+  onClose,
+  toolToggles,
+  togglingTool,
+  onToggleTool,
+}: Props) {
   const { t } = useTranslation();
   const [doc, setDoc] = useState<SkillDocument | null>(null);
   const [loading, setLoading] = useState(false);
@@ -83,51 +87,59 @@ export function SkillDetailPanel({ skill, onClose, syncMeta, syncing, onSync }: 
           </div>
         </div>
 
-        {syncMeta && onSync && (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-subtle px-6 py-3 text-[14px]">
-            <div className="flex min-w-0 flex-wrap items-center gap-2 text-muted">
-              {syncMeta.syncedToolKeys.length > 0 ? (
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-              ) : (
-                <Circle className="h-3.5 w-3.5 text-faint" />
-              )}
-              <span className="rounded-full border border-border-subtle bg-surface px-2.5 py-1 text-[13px] font-medium text-tertiary">
+        {toolToggles && onToggleTool && (
+          <div className="border-b border-border-subtle px-6 py-3">
+            <div className="mb-2.5 flex items-center justify-between text-[13px]">
+              <span className="font-medium text-secondary">{t("mySkills.agentTogglesTitle")}</span>
+              <span className="rounded-full border border-border-subtle bg-surface px-2 py-0.5 text-[12px] text-muted">
                 {t("mySkills.syncSummary", {
-                  synced: syncMeta.syncedToolKeys.length,
-                  total: syncMeta.syncedToolKeys.length + syncMeta.pendingToolKeys.length,
+                  synced: toolToggles.filter((item) => item.enabled).length,
+                  total: toolToggles.length,
                 })}
               </span>
-              {syncMeta.syncedToolLabels.length > 0 && (
-                <span className="truncate text-[13.5px] text-muted">{syncMeta.syncedToolLabels.join(", ")}</span>
-              )}
             </div>
-            <div className="flex items-center gap-2">
-              {syncMeta.pendingToolKeys.length > 0 && (
-                <button
-                  onClick={() => onSync("sync")}
-                  disabled={syncing}
-                  className={cn(
-                    "inline-flex h-8 items-center rounded-lg px-3 text-[13px] font-medium transition-colors outline-none",
-                    "text-muted hover:bg-surface-hover hover:text-secondary",
-                    syncing && "opacity-50"
-                  )}
-                >
-                  {syncing ? <Loader2 className="h-3 w-3 animate-spin" /> : t("mySkills.syncMissing", { count: syncMeta.pendingToolKeys.length })}
-                </button>
-              )}
-              {syncMeta.syncedToolKeys.length > 0 && (
-                <button
-                  onClick={() => onSync("unsync")}
-                  disabled={syncing}
-                  className={cn(
-                    "inline-flex h-8 items-center rounded-lg px-3 text-[13px] font-medium transition-colors outline-none",
-                    "text-faint hover:bg-red-500/10 hover:text-red-400",
-                    syncing && "opacity-50"
-                  )}
-                >
-                  {t("mySkills.unsyncSelected", { count: syncMeta.syncedToolKeys.length })}
-                </button>
-              )}
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+              {toolToggles.map((toggle) => {
+                const disabledReason = !toggle.installed
+                  ? t("mySkills.agentToggleNotInstalled")
+                  : !toggle.globally_enabled
+                    ? t("mySkills.agentToggleDisabledGlobally")
+                    : "";
+                const disabled = !toggle.installed || !toggle.globally_enabled;
+                const loadingToggle = togglingTool === toggle.tool;
+                return (
+                  <div
+                    key={toggle.tool}
+                    className={cn(
+                      "flex items-center gap-2 rounded-[6px] border px-2.5 py-2 text-[12.5px]",
+                      toggle.enabled ? "border-border bg-surface" : "border-border-subtle bg-bg-secondary",
+                      disabled && "opacity-55"
+                    )}
+                    title={disabledReason}
+                  >
+                    <button
+                      onClick={() => onToggleTool(toggle.tool, !toggle.enabled)}
+                      disabled={disabled || loadingToggle}
+                      className="shrink-0 outline-none"
+                      title={toggle.enabled ? t("settings.disableAgent") : t("settings.enableAgent")}
+                    >
+                      {loadingToggle ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-muted" />
+                      ) : toggle.enabled ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                      ) : (
+                        <Circle className="h-3.5 w-3.5 text-muted" />
+                      )}
+                    </button>
+                    <div className="min-w-0">
+                      <div className="truncate text-[13px] font-medium text-secondary">
+                        {toggle.display_name}
+                      </div>
+                      {disabledReason && <div className="truncate text-[12px] text-muted">{disabledReason}</div>}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

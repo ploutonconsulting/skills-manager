@@ -8,6 +8,7 @@ use crate::core::{
     skill_store::{ScenarioRecord, SkillStore},
     sync_engine, tool_adapters,
 };
+use std::collections::HashSet;
 
 fn refresh_tray_menu_best_effort(app: &tauri::AppHandle) {
     if let Err(err) = crate::refresh_tray_menu(app) {
@@ -25,6 +26,29 @@ fn ensure_scenario_exists(store: &SkillStore, scenario_id: &str) -> Result<(), A
         return Err(AppError::not_found("Scenario not found"));
     }
     Ok(())
+}
+
+pub(crate) fn enabled_installed_adapters_for_scenario_skill(
+    store: &SkillStore,
+    scenario_id: &str,
+    skill_id: &str,
+) -> Result<Vec<tool_adapters::ToolAdapter>, AppError> {
+    let adapters = tool_adapters::enabled_installed_adapters(store);
+    let adapter_keys: Vec<String> = adapters.iter().map(|a| a.key.clone()).collect();
+
+    store
+        .ensure_scenario_skill_tool_defaults(scenario_id, skill_id, &adapter_keys)
+        .map_err(AppError::db)?;
+
+    let enabled = store
+        .get_enabled_tools_for_scenario_skill(scenario_id, skill_id)
+        .map_err(AppError::db)?;
+    let enabled_set: HashSet<String> = enabled.into_iter().collect();
+
+    Ok(adapters
+        .into_iter()
+        .filter(|adapter| enabled_set.contains(&adapter.key))
+        .collect())
 }
 
 #[derive(Debug, Serialize)]
@@ -250,8 +274,8 @@ pub async fn add_skill_to_scenario(
         // If this is the active scenario, sync the skill
         if let Ok(Some(active_id)) = store.get_active_scenario_id() {
             if active_id == scenario_id {
-                // Sync to all enabled installed tools
-                let adapters = tool_adapters::enabled_installed_adapters(&store);
+                let adapters =
+                    enabled_installed_adapters_for_scenario_skill(&store, &scenario_id, &skill_id)?;
                 let configured_mode = store.get_setting("sync_mode").map_err(AppError::db)?;
                 if let Ok(Some(skill)) = store.get_skill_by_id(&skill_id) {
                     let source = PathBuf::from(&skill.central_path);
@@ -354,11 +378,12 @@ pub(crate) fn sync_scenario_skills(store: &SkillStore, scenario_id: &str) -> Res
     let skills = store
         .get_skills_for_scenario(scenario_id)
         .map_err(AppError::db)?;
-    let adapters = tool_adapters::enabled_installed_adapters(store);
     let configured_mode = store.get_setting("sync_mode").map_err(AppError::db)?;
 
     for skill in &skills {
         let source = PathBuf::from(&skill.central_path);
+        let adapters =
+            enabled_installed_adapters_for_scenario_skill(store, scenario_id, &skill.id)?;
         for adapter in &adapters {
             let target = adapter.skills_dir().join(&skill.name);
             let mode = sync_engine::sync_mode_for_tool(&adapter.key, configured_mode.as_deref());
