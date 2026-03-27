@@ -400,11 +400,11 @@ export function Settings() {
       <div className="space-y-6">
         {/* Agent status */}
         <section>
-          <div className="flex items-center justify-between mb-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="app-section-title">
               {t("settings.supportedAgents")} ({tools.filter((t) => t.installed).length}/{tools.length})
             </h2>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 onClick={() => setShowAddCustom(true)}
                 className="flex items-center gap-1 text-[13px] text-accent hover:text-accent-light transition-colors font-medium outline-none"
@@ -460,13 +460,13 @@ export function Settings() {
               </div>
               <div>
                 <label className="text-[12px] text-muted mb-1 block">{t("settings.skillsPath")}</label>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <input
                     type="text"
                     value={customPath}
                     onChange={(e) => setCustomPath(e.target.value)}
                     placeholder={t("settings.skillsPathPlaceholder")}
-                    className={`${fieldClass} flex-1 font-mono`}
+                    className={`${fieldClass} min-w-0 flex-1 font-mono`}
                   />
                   <button
                     onClick={() => handleBrowsePath(setCustomPath)}
@@ -604,15 +604,15 @@ export function Settings() {
           </h2>
           <div className="app-panel overflow-hidden divide-y divide-border-subtle">
             {/* Repo path */}
-            <div className="px-4 py-3 flex items-center justify-between gap-4">
-              <div className="min-w-0">
+            <div className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
                 <h3 className="text-[13px] text-secondary font-medium mb-0.5">{t("settings.repoPath")}</h3>
                 <p className="text-[13px] text-muted">{t("settings.repoPathDesc")}</p>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <div className="flex items-center gap-1.5 bg-background border border-border-subtle rounded-[4px] px-2 py-1">
+              <div className="flex max-w-full flex-wrap items-center gap-2">
+                <div className="flex min-w-0 items-center gap-1.5 rounded-[4px] border border-border-subtle bg-background px-2 py-1">
                   <Folder className="w-3 h-3 text-muted" />
-                  <span className="text-[13px] font-mono text-tertiary">{displayedRepoPath}</span>
+                  <span className="truncate text-[13px] font-mono text-tertiary">{displayedRepoPath}</span>
                 </div>
                 <button
                   type="button"
@@ -636,12 +636,12 @@ export function Settings() {
             </div>
 
             {/* Sync mode */}
-            <div className="px-4 py-3 flex items-center justify-between gap-4">
-              <div>
+            <div className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
                 <h3 className="text-[13px] text-secondary font-medium mb-0.5">{t("settings.syncMode")}</h3>
                 <p className="text-[13px] text-muted">{t("settings.syncModeDesc")}</p>
               </div>
-              <div className="flex bg-background border border-border-subtle rounded-[4px] p-px shrink-0">
+              <div className="flex flex-wrap rounded-[4px] border border-border-subtle bg-background p-px">
                 <button
                   onClick={() => handleSyncModeChange("symlink")}
                   className={cn(
@@ -664,12 +664,12 @@ export function Settings() {
             </div>
 
             {/* Theme */}
-            <div className="px-4 py-3 flex items-center justify-between gap-4">
-              <div>
+            <div className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
                 <h3 className="text-[13px] text-secondary font-medium mb-0.5">{t("settings.theme")}</h3>
                 <p className="text-[13px] text-muted">{t("settings.themeDesc")}</p>
               </div>
-              <div className="flex bg-background border border-border-subtle rounded-[4px] p-px shrink-0">
+              <div className="flex flex-wrap rounded-[4px] border border-border-subtle bg-background p-px">
                 {themeOptions.map((opt) => {
                   const Icon = opt.icon;
                   return (
@@ -689,12 +689,12 @@ export function Settings() {
             </div>
 
             {/* Text size */}
-            <div className="px-4 py-3 flex items-center justify-between gap-4">
-              <div>
+            <div className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
                 <h3 className="text-[13px] text-secondary font-medium mb-0.5">{t("settings.textSize")}</h3>
                 <p className="text-[13px] text-muted">{t("settings.textSizeDesc")}</p>
               </div>
-              <div className="flex bg-background border border-border-subtle rounded-[4px] p-px shrink-0">
+              <div className="flex flex-wrap rounded-[4px] border border-border-subtle bg-background p-px">
                 {([
                   { value: "small", label: t("settings.textSizeSmall") },
                   { value: "default", label: t("settings.textSizeDefault") },
@@ -720,8 +720,8 @@ export function Settings() {
             </div>
 
             {/* Default scenario */}
-            <div className="px-4 py-3 flex items-center justify-between gap-4">
-              <div>
+            <div className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
                 <h3 className="text-[13px] text-secondary font-medium mb-0.5">{t("settings.defaultScenario")}</h3>
                 <p className="text-[13px] text-muted">{t("settings.defaultScenarioDesc")}</p>
               </div>
@@ -738,11 +738,11 @@ export function Settings() {
             </div>
 
             {/* Language */}
-            <div className="px-4 py-3 flex items-center justify-between gap-4">
-              <div>
+            <div className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
                 <h3 className="text-[13px] text-secondary font-medium">{t("settings.language")}</h3>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex max-w-full flex-wrap items-center gap-2">
                 <Globe className="w-3.5 h-3.5 text-muted" />
                 <select
                   value={i18n.language}
@@ -757,15 +757,15 @@ export function Settings() {
             </div>
 
             {/* Close action */}
-            <div className="px-4 py-3 flex items-center justify-between gap-4">
-              <div>
+            <div className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
                 <h3 className="text-[13px] text-secondary font-medium mb-0.5">{t("settings.closeAction")}</h3>
                 <p className="text-[13px] text-muted">{t("settings.closeActionDesc")}</p>
                 {!showTrayIcon && (
                   <p className="text-[12px] text-muted mt-1">{t("settings.trayIconOffHint")}</p>
                 )}
               </div>
-              <div className="flex bg-background border border-border-subtle rounded-[4px] p-px shrink-0">
+              <div className="flex flex-wrap rounded-[4px] border border-border-subtle bg-background p-px">
                 {(["", "hide", "close"] as const).map((val) => (
                   <button
                     key={val}
@@ -784,12 +784,12 @@ export function Settings() {
             </div>
 
             {/* Tray icon */}
-            <div className="px-4 py-3 flex items-center justify-between gap-4">
-              <div>
+            <div className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
                 <h3 className="text-[13px] text-secondary font-medium mb-0.5">{t("settings.trayIcon")}</h3>
                 <p className="text-[13px] text-muted">{t("settings.trayIconDesc")}</p>
               </div>
-              <div className="flex bg-background border border-border-subtle rounded-[4px] p-px shrink-0">
+              <div className="flex flex-wrap rounded-[4px] border border-border-subtle bg-background p-px">
                 <button
                   onClick={() => handleShowTrayIconChange(true)}
                   className={cn(
@@ -822,13 +822,13 @@ export function Settings() {
             <div className="px-4 py-3">
               <h3 className="text-[13px] text-secondary font-medium mb-0.5">{t("settings.proxyUrl")}</h3>
               <p className="text-[13px] text-muted mb-2">{t("settings.proxyUrlDesc")}</p>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <input
                   type="text"
                   value={proxyInput}
                   onChange={(e) => setProxyInput(e.target.value)}
                   placeholder={t("settings.proxyUrlPlaceholder")}
-                  className={`${fieldClass} flex-1 font-mono`}
+                  className={`${fieldClass} min-w-0 flex-1 font-mono`}
                 />
                 <button
                   onClick={handleSaveProxy}
@@ -866,13 +866,13 @@ export function Settings() {
                   <ExternalLink className="h-3 w-3" />
                 </button>
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <input
                   type="password"
                   value={skillsmpApiKey}
                   onChange={(e) => setSkillsmpApiKey(e.target.value)}
                   placeholder="sk_live_..."
-                  className={`${fieldClass} flex-1 font-mono`}
+                  className={`${fieldClass} min-w-0 flex-1 font-mono`}
                 />
                 <button
                   onClick={handleSaveSkillsmpApiKey}
@@ -900,13 +900,13 @@ export function Settings() {
             <div className="px-4 py-3">
               <h3 className="text-[13px] text-secondary font-medium mb-0.5">{t("settings.gitRemoteUrl")}</h3>
               <p className="text-[13px] text-muted mb-2">{t("settings.gitSyncConfigDesc")}</p>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <input
                   type="text"
                   value={gitRemoteInput}
                   onChange={(e) => setGitRemoteInput(e.target.value)}
                   placeholder={t("settings.gitRemoteUrlPlaceholder")}
-                  className={`${fieldClass} flex-1 font-mono`}
+                  className={`${fieldClass} min-w-0 flex-1 font-mono`}
                 />
                 <button
                   onClick={handleSaveGitRemote}
@@ -927,8 +927,8 @@ export function Settings() {
 
         {/* About */}
         <section>
-          <div className="app-panel p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="app-panel flex flex-wrap items-start justify-between gap-3 p-4">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-surface-hover border border-border flex items-center justify-center">
                 <Settings2 className="w-4 h-4 text-accent" />
               </div>
@@ -944,7 +944,7 @@ export function Settings() {
                 </p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {updateInfo?.has_update ? (
                 IS_WINDOWS ? (
                   <>
