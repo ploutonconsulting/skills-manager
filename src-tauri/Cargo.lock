@@ -4504,7 +4504,6 @@ dependencies = [
  "git2",
  "hex",
  "image",
- "libc",
  "log",
  "notify",
  "rand 0.8.5",
