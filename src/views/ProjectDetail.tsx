@@ -123,12 +123,6 @@ function getGroupStatus(variants: ProjectSkill[]): ProjectSkill["sync_status"] {
   return "project_only";
 }
 
-function areAgentSetsEqual(left: string[], right: string[]) {
-  if (left.length !== right.length) return false;
-  const rightSet = new Set(right);
-  return left.every((value) => rightSet.has(value));
-}
-
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -902,8 +896,6 @@ export function ProjectDetail() {
               skill.status === "diverged";
             const statusMeta = getSyncStatusMeta(t, skill.status);
             const assignedAgents = skill.variants.map((variant) => variant.agent).sort();
-            const hasCustomAssignment =
-              defaultAgentKeys.length > 0 && !areAgentSetsEqual(assignedAgents, defaultAgentKeys);
 
             if (viewMode === "grid") {
               return (
@@ -966,11 +958,6 @@ export function ProjectDetail() {
                       <span className={cn("rounded-full px-2 py-0.5 text-[12px] font-medium", statusMeta.className)}>
                         {statusMeta.label}
                       </span>
-                      {hasCustomAssignment && (
-                        <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[12px] font-medium text-muted">
-                          {t("project.customAssignment", { assigned: assignedAgents.length, total: defaultAgentKeys.length })}
-                        </span>
-                      )}
                       {skill.enabledCount === 0 && (
                         <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[12px] font-medium text-red-600 dark:text-red-300">
                           {t("project.disabled")}
@@ -1104,11 +1091,6 @@ export function ProjectDetail() {
                   <span className={cn("rounded-full px-2 py-0.5 text-[12px] font-medium", statusMeta.className)}>
                     {statusMeta.label}
                   </span>
-                  {hasCustomAssignment && (
-                    <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[12px] font-medium text-muted">
-                      {t("project.customAssignment", { assigned: assignedAgents.length, total: defaultAgentKeys.length })}
-                    </span>
-                  )}
                   {skill.enabledCount === 0 && (
                     <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[12px] font-medium text-red-600 dark:text-red-300">
                       {t("project.disabled")}
