@@ -16,15 +16,18 @@ import {
   type SkillDocument,
   type SourceSkillDocument,
   type SkillToolToggle,
+  type ToolInfo,
 } from "../lib/tauri";
 import { DocumentDiffViewer } from "./DocumentDiffViewer";
 import { DetailSheet } from "./DetailSheet";
 import { SkillMarkdown } from "./SkillMarkdown";
 import { AgentToggleSection, type AgentToggleItem } from "./AgentToggleSection";
+import { SyncDots } from "./SyncDots";
 
 interface Props {
   skill: ManagedSkill | null;
   onClose: () => void;
+  tools?: ToolInfo[];
   toolToggles?: SkillToolToggle[] | null;
   togglingTool?: string | null;
   onToggleTool?: (tool: string, enabled: boolean) => void;
@@ -33,6 +36,7 @@ interface Props {
 export function SkillDetailPanel({
   skill,
   onClose,
+  tools,
   toolToggles,
   togglingTool,
   onToggleTool,
@@ -53,6 +57,7 @@ export function SkillDetailPanel({
       key={panelKey}
       skill={skill}
       onClose={onClose}
+      tools={tools}
       toolToggles={toolToggles}
       togglingTool={togglingTool}
       onToggleTool={onToggleTool}
@@ -63,12 +68,14 @@ export function SkillDetailPanel({
 function SkillDetailPanelContent({
   skill,
   onClose,
+  tools,
   toolToggles,
   togglingTool,
   onToggleTool,
 }: {
   skill: ManagedSkill;
   onClose: () => void;
+  tools?: ToolInfo[];
   toolToggles?: SkillToolToggle[] | null;
   togglingTool?: string | null;
   onToggleTool?: (tool: string, enabled: boolean) => void;
@@ -186,7 +193,23 @@ function SkillDetailPanelContent({
 
   const meta = (
     <>
-      <div className="flex min-w-0 items-center gap-2 text-[13px] text-muted">
+      <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted">
+        {tools && <SyncDots skill={skill} tools={tools} size="sm" />}
+        {skill.tags.length > 0 && (
+          <>
+            {tools && <span className="mx-0.5 h-3 w-px bg-border-subtle" />}
+            {skill.tags.map((tag) => (
+              <span
+                key={tag}
+                className="inline-flex items-center rounded-full bg-surface-hover px-2 py-0.5 text-[11px] font-medium text-secondary"
+              >
+                {tag}
+              </span>
+            ))}
+          </>
+        )}
+      </div>
+      <div className="mt-3 flex min-w-0 items-center gap-2 text-[13px] text-muted">
         <Folder className="h-3.5 w-3.5 shrink-0" />
         <span className="font-mono truncate" title={skill.central_path}>
           {skill.central_path}

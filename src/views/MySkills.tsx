@@ -1552,6 +1552,7 @@ export function MySkills() {
         key={selectedSkill?.id ?? "skill-detail-empty"}
         skill={selectedSkill}
         onClose={closeSkillDetail}
+        tools={tools}
         toolToggles={toolToggles}
         togglingTool={togglingToolKey}
         onToggleTool={handleToggleSkillTool}
