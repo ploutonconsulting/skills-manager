@@ -95,11 +95,28 @@ pub fn sync_skill(source: &Path, target: &Path, mode: SyncMode) -> Result<SyncMo
 }
 
 pub fn remove_target(target: &Path) -> Result<()> {
-    if target.is_symlink() {
-        std::fs::remove_file(target)?;
-    } else if target.is_dir() {
+    let metadata = match std::fs::symlink_metadata(target) {
+        Ok(metadata) => metadata,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(err) => return Err(err.into()),
+    };
+
+    if metadata.file_type().is_symlink() {
+        #[cfg(windows)]
+        {
+            if target.is_dir() {
+                std::fs::remove_dir(target)?;
+            } else {
+                std::fs::remove_file(target)?;
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            std::fs::remove_file(target)?;
+        }
+    } else if metadata.is_dir() {
         std::fs::remove_dir_all(target)?;
-    } else if target.exists() {
+    } else {
         std::fs::remove_file(target)?;
     }
     Ok(())
@@ -353,6 +370,22 @@ mod tests {
         remove_target(&link).unwrap();
         assert!(!link.exists());
         assert!(real.exists()); // original untouched
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn remove_target_removes_directory_symlink() {
+        let tmp = tempdir().unwrap();
+        let real = tmp.path().join("real");
+        fs::create_dir_all(&real).unwrap();
+        fs::write(real.join("SKILL.md"), "# hello").unwrap();
+        let link = tmp.path().join("link");
+        std::os::windows::fs::symlink_dir(&real, &link).unwrap();
+
+        remove_target(&link).unwrap();
+        assert!(!link.exists());
+        assert!(real.exists());
+        assert!(real.join("SKILL.md").exists());
     }
 
     #[test]
