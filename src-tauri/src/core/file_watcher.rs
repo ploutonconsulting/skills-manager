@@ -84,17 +84,19 @@ fn sync_watch_set(
     watcher: &mut RecommendedWatcher,
     watched: &mut HashSet<PathBuf>,
     store: &SkillStore,
-) {
+) -> bool {
     let desired: HashSet<PathBuf> = collect_watch_paths(store)
         .into_iter()
         .filter_map(|path| watch_target(&path))
         .collect();
+    let mut changed = false;
 
     for stale in watched.difference(&desired).cloned().collect::<Vec<_>>() {
         if let Err(err) = watcher.unwatch(&stale) {
             log::debug!("Failed to unwatch {}: {err}", stale.display());
         }
         watched.remove(&stale);
+        changed = true;
     }
 
     for path in desired {
@@ -104,12 +106,15 @@ fn sync_watch_set(
         match watcher.watch(&path, RecursiveMode::Recursive) {
             Ok(()) => {
                 watched.insert(path);
+                changed = true;
             }
             Err(err) => {
                 log::debug!("Failed to watch {}: {err}", path.display());
             }
         }
     }
+
+    changed
 }
 
 fn should_emit(event: &Event) -> bool {
@@ -138,7 +143,15 @@ pub fn start_file_watcher<R: tauri::Runtime>(app: tauri::AppHandle<R>, store: Ar
 
         loop {
             if last_sync.elapsed() >= WATCH_RESCAN_INTERVAL {
-                sync_watch_set(&mut watcher, &mut watched, &store);
+                if sync_watch_set(&mut watcher, &mut watched, &store)
+                    && last_emit.elapsed() >= WATCH_EMIT_DEBOUNCE
+                {
+                    if let Err(err) = app.emit(APP_FS_CHANGED_EVENT, ()) {
+                        log::debug!("Failed to emit app-files-changed: {err}");
+                    } else {
+                        last_emit = Instant::now();
+                    }
+                }
                 last_sync = Instant::now();
             }
 
@@ -235,10 +248,7 @@ mod tests {
 
         let paths = collect_watch_paths(&store);
         assert!(!paths.contains(&skills_dir), "empty skills dir watched");
-        assert!(
-            !paths.contains(&disabled_dir),
-            "empty disabled dir watched"
-        );
+        assert!(!paths.contains(&disabled_dir), "empty disabled dir watched");
         assert!(!paths.contains(&agent_dir), "agent parent dir watched");
     }
 
@@ -267,13 +277,20 @@ mod tests {
         let skills_dir = project_path.join(".codex").join("skills");
         let agent_dir = project_path.join(".codex");
         fs::create_dir_all(skills_dir.join("hello")).unwrap();
-        fs::write(skills_dir.join("hello").join("SKILL.md"), "---\nname: hello\n---\n").unwrap();
+        fs::write(
+            skills_dir.join("hello").join("SKILL.md"),
+            "---\nname: hello\n---\n",
+        )
+        .unwrap();
 
         let store = SkillStore::new(&db_path).unwrap();
         insert_non_linked_project(&store, &project_path);
 
         let paths = collect_watch_paths(&store);
-        assert!(paths.contains(&skills_dir), "non-empty skills dir not watched");
+        assert!(
+            paths.contains(&skills_dir),
+            "non-empty skills dir not watched"
+        );
         assert!(!paths.contains(&agent_dir), "agent parent dir watched");
     }
 }
