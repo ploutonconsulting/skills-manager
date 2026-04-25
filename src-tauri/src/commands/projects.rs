@@ -254,6 +254,35 @@ fn remove_workspace_skill_target(path: &Path) -> Result<(), AppError> {
     sync_engine::remove_target(path).map_err(AppError::io)
 }
 
+// Walks upward from `start`, removing each empty directory until reaching
+// (and including) `root`. Stops at the first non-empty directory or any
+// other error. `fs::remove_dir` only succeeds on empty directories, so this
+// will never delete a directory that still holds skills.
+fn cleanup_empty_dirs_up_to(start: &Path, root: &Path) {
+    let Ok(root_canonical) = std::fs::canonicalize(root) else {
+        return;
+    };
+    let mut current = start.to_path_buf();
+    loop {
+        let Ok(current_canonical) = std::fs::canonicalize(&current) else {
+            return;
+        };
+        if !current_canonical.starts_with(&root_canonical) {
+            return;
+        }
+        if std::fs::remove_dir(&current).is_err() {
+            return;
+        }
+        if current_canonical == root_canonical {
+            return;
+        }
+        match current.parent() {
+            Some(parent) => current = parent.to_path_buf(),
+            None => return,
+        }
+    }
+}
+
 fn remove_symlink_entry(path: &Path) -> Result<(), AppError> {
     let metadata = match std::fs::symlink_metadata(path) {
         Ok(m) => m,
@@ -285,6 +314,9 @@ fn set_project_skill_enabled_state(
             if disabled_path.exists() {
                 ensure_dir_within_root(&disabled_path, disabled_dir)?;
                 remove_symlink_entry(&disabled_path)?;
+                if let Some(parent) = disabled_path.parent() {
+                    cleanup_empty_dirs_up_to(parent, disabled_dir);
+                }
             }
             return Ok(());
         }
@@ -304,6 +336,9 @@ fn set_project_skill_enabled_state(
             ));
         }
         std::fs::rename(&disabled_path, &enabled_path)?;
+        if let Some(parent) = disabled_path.parent() {
+            cleanup_empty_dirs_up_to(parent, disabled_dir);
+        }
         return Ok(());
     }
 
@@ -1080,8 +1115,8 @@ mod tests {
         classify_sync_status, ensure_distinct_linked_workspace_roots,
         remove_workspace_skill_target, set_project_skill_enabled_state,
     };
-    use crate::core::error::ErrorKind;
     use crate::core::content_hash;
+    use crate::core::error::ErrorKind;
     use crate::core::project_scanner::ProjectSkillInfo;
     use crate::core::skill_store::SkillRecord;
     use std::fs;
@@ -1259,7 +1294,8 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn set_project_skill_enabled_state_disabling_cleans_duplicate_symlink_without_touching_target() {
+    fn set_project_skill_enabled_state_disabling_cleans_duplicate_symlink_without_touching_target()
+    {
         use std::os::unix::fs::symlink;
 
         let tmp = tempdir().unwrap();
@@ -1321,6 +1357,72 @@ mod tests {
     }
 
     #[test]
+    fn set_project_skill_enabled_state_enabling_removes_emptied_disabled_dir() {
+        let tmp = tempdir().unwrap();
+        let skills_root = tmp.path().join("skills");
+        let disabled_root = tmp.path().join("skills-disabled");
+        let relative_path = "my-skill";
+
+        let real_disabled = disabled_root.join(relative_path);
+        fs::create_dir_all(&skills_root).unwrap();
+        fs::create_dir_all(&real_disabled).unwrap();
+        fs::write(real_disabled.join("SKILL.md"), "---\nname: my-skill\n---\n").unwrap();
+
+        set_project_skill_enabled_state(&skills_root, &disabled_root, relative_path, true).unwrap();
+
+        assert!(skills_root.join(relative_path).join("SKILL.md").is_file());
+        assert!(!disabled_root.exists());
+    }
+
+    #[test]
+    fn set_project_skill_enabled_state_enabling_keeps_disabled_dir_when_other_skills_remain() {
+        let tmp = tempdir().unwrap();
+        let skills_root = tmp.path().join("skills");
+        let disabled_root = tmp.path().join("skills-disabled");
+        let relative_path = "skill-a";
+
+        let real_disabled_a = disabled_root.join(relative_path);
+        let real_disabled_b = disabled_root.join("skill-b");
+        fs::create_dir_all(&skills_root).unwrap();
+        fs::create_dir_all(&real_disabled_a).unwrap();
+        fs::create_dir_all(&real_disabled_b).unwrap();
+        fs::write(
+            real_disabled_a.join("SKILL.md"),
+            "---\nname: skill-a\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            real_disabled_b.join("SKILL.md"),
+            "---\nname: skill-b\n---\n",
+        )
+        .unwrap();
+
+        set_project_skill_enabled_state(&skills_root, &disabled_root, relative_path, true).unwrap();
+
+        assert!(skills_root.join(relative_path).join("SKILL.md").is_file());
+        assert!(disabled_root.is_dir());
+        assert!(real_disabled_b.join("SKILL.md").is_file());
+    }
+
+    #[test]
+    fn set_project_skill_enabled_state_enabling_removes_empty_nested_disabled_dirs() {
+        let tmp = tempdir().unwrap();
+        let skills_root = tmp.path().join("skills");
+        let disabled_root = tmp.path().join("skills-disabled");
+        let relative_path = "category/sub/skill-a";
+
+        let real_disabled = disabled_root.join(relative_path);
+        fs::create_dir_all(&skills_root).unwrap();
+        fs::create_dir_all(&real_disabled).unwrap();
+        fs::write(real_disabled.join("SKILL.md"), "---\nname: skill-a\n---\n").unwrap();
+
+        set_project_skill_enabled_state(&skills_root, &disabled_root, relative_path, true).unwrap();
+
+        assert!(skills_root.join(relative_path).join("SKILL.md").is_file());
+        assert!(!disabled_root.exists());
+    }
+
+    #[test]
     fn set_project_skill_enabled_state_rejects_real_dir_duplicate_on_enable() {
         let tmp = tempdir().unwrap();
         let skills_root = tmp.path().join("skills");
@@ -1334,8 +1436,9 @@ mod tests {
         fs::create_dir_all(&real_disabled).unwrap();
         fs::write(real_disabled.join("SKILL.md"), "---\nname: my-skill\n---\n").unwrap();
 
-        let err = set_project_skill_enabled_state(&skills_root, &disabled_root, relative_path, true)
-            .unwrap_err();
+        let err =
+            set_project_skill_enabled_state(&skills_root, &disabled_root, relative_path, true)
+                .unwrap_err();
         assert_eq!(err.kind, ErrorKind::InvalidInput);
         // Both real dirs must still exist
         assert!(real_enabled.join("SKILL.md").exists());
@@ -1356,8 +1459,9 @@ mod tests {
         fs::create_dir_all(&real_disabled).unwrap();
         fs::write(real_disabled.join("SKILL.md"), "---\nname: my-skill\n---\n").unwrap();
 
-        let err = set_project_skill_enabled_state(&skills_root, &disabled_root, relative_path, false)
-            .unwrap_err();
+        let err =
+            set_project_skill_enabled_state(&skills_root, &disabled_root, relative_path, false)
+                .unwrap_err();
         assert_eq!(err.kind, ErrorKind::InvalidInput);
         assert!(real_enabled.join("SKILL.md").exists());
         assert!(real_disabled.join("SKILL.md").exists());
