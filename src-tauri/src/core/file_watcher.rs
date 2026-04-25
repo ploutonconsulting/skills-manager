@@ -46,12 +46,17 @@ fn collect_watch_paths(store: &SkillStore) -> Vec<PathBuf> {
                 let skills_dir = project_path.join(&adapter.relative_skills_dir);
                 let disabled_dir =
                     project_path.join(format!("{}-disabled", &adapter.relative_skills_dir));
-                // Watch the parent directory so we detect creation of new skills dirs.
-                if let Some(parent) = skills_dir.parent() {
-                    paths.push(parent.to_path_buf());
+                // Only watch dirs that actually have skills inside. Watching the parent
+                // or empty leaf dirs would hold OS handles (Windows ReadDirectoryChangesW)
+                // and prevent users from deleting the agent-config folder (e.g. .codex)
+                // after they remove all skills from it. Newly-populated dirs are picked
+                // up by the polling rescan within WATCH_RESCAN_INTERVAL.
+                if dir_has_entries(&skills_dir) {
+                    paths.push(skills_dir);
                 }
-                paths.push(skills_dir);
-                paths.push(disabled_dir);
+                if dir_has_entries(&disabled_dir) {
+                    paths.push(disabled_dir);
+                }
             }
         }
     }
@@ -63,11 +68,16 @@ fn collect_watch_paths(store: &SkillStore) -> Vec<PathBuf> {
 
 fn watch_target(path: &Path) -> Option<PathBuf> {
     if path.exists() {
-        return Some(path.to_path_buf());
+        Some(path.to_path_buf())
+    } else {
+        None
     }
-    path.parent()
-        .filter(|parent| parent.exists())
-        .map(|parent| parent.to_path_buf())
+}
+
+fn dir_has_entries(path: &Path) -> bool {
+    std::fs::read_dir(path)
+        .map(|mut iter| iter.next().is_some())
+        .unwrap_or(false)
 }
 
 fn sync_watch_set(
@@ -190,5 +200,80 @@ mod tests {
         assert!(paths.contains(&disabled_root));
         assert!(!paths.contains(&skills_root.parent().unwrap().to_path_buf()));
         assert!(!paths.contains(&disabled_root.parent().unwrap().to_path_buf()));
+    }
+
+    fn insert_non_linked_project(store: &SkillStore, project_path: &std::path::Path) {
+        store
+            .insert_project(&ProjectRecord {
+                id: "proj-1".to_string(),
+                name: "proj-1".to_string(),
+                path: project_path.to_string_lossy().to_string(),
+                workspace_type: "project".to_string(),
+                linked_agent_key: None,
+                linked_agent_name: None,
+                disabled_path: None,
+                sort_order: 0,
+                created_at: 0,
+                updated_at: 0,
+            })
+            .unwrap();
+    }
+
+    #[test]
+    fn non_linked_project_skips_empty_skill_dirs() {
+        let tmp = tempdir().unwrap();
+        let db_path = tmp.path().join("watcher.db");
+        let project_path = tmp.path().join("proj");
+        let skills_dir = project_path.join(".codex").join("skills");
+        let disabled_dir = project_path.join(".codex").join("skills-disabled");
+        let agent_dir = project_path.join(".codex");
+        fs::create_dir_all(&skills_dir).unwrap();
+        fs::create_dir_all(&disabled_dir).unwrap();
+
+        let store = SkillStore::new(&db_path).unwrap();
+        insert_non_linked_project(&store, &project_path);
+
+        let paths = collect_watch_paths(&store);
+        assert!(!paths.contains(&skills_dir), "empty skills dir watched");
+        assert!(
+            !paths.contains(&disabled_dir),
+            "empty disabled dir watched"
+        );
+        assert!(!paths.contains(&agent_dir), "agent parent dir watched");
+    }
+
+    #[test]
+    fn non_linked_project_skips_missing_skill_dirs() {
+        let tmp = tempdir().unwrap();
+        let db_path = tmp.path().join("watcher.db");
+        let project_path = tmp.path().join("proj");
+        fs::create_dir_all(&project_path).unwrap();
+        let skills_dir = project_path.join(".codex").join("skills");
+        let agent_dir = project_path.join(".codex");
+
+        let store = SkillStore::new(&db_path).unwrap();
+        insert_non_linked_project(&store, &project_path);
+
+        let paths = collect_watch_paths(&store);
+        assert!(!paths.contains(&skills_dir));
+        assert!(!paths.contains(&agent_dir));
+    }
+
+    #[test]
+    fn non_linked_project_watches_non_empty_skill_dirs() {
+        let tmp = tempdir().unwrap();
+        let db_path = tmp.path().join("watcher.db");
+        let project_path = tmp.path().join("proj");
+        let skills_dir = project_path.join(".codex").join("skills");
+        let agent_dir = project_path.join(".codex");
+        fs::create_dir_all(skills_dir.join("hello")).unwrap();
+        fs::write(skills_dir.join("hello").join("SKILL.md"), "---\nname: hello\n---\n").unwrap();
+
+        let store = SkillStore::new(&db_path).unwrap();
+        insert_non_linked_project(&store, &project_path);
+
+        let paths = collect_watch_paths(&store);
+        assert!(paths.contains(&skills_dir), "non-empty skills dir not watched");
+        assert!(!paths.contains(&agent_dir), "agent parent dir watched");
     }
 }
