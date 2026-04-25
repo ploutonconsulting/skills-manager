@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0] - 2026-04-25
+
+### Added
+- Allow editing project skills path for custom agents
+- Multi-device sync metadata support
+- New cyan/teal S app icon design
+
+### Changed
+- Updated sidebar icon to match the new S design (transparent background)
+
+### Fixed
+- Wrap Dock icon in proper macOS squircle so corners render rounded
+- Emit refresh event when polling rescan picks up new watch directories
+- Stop watching empty skill dirs so users can delete agent folders
+- Remove emptied skills-disabled directory after re-enabling last skill
+
+## [1.14.3] - 2026-04-21
+
+### Added
+- 
+
+### Changed
+- 
+
+### Fixed
+- 
+
+### Removed
+- 
 ## [1.14.3] - 2026-04-21
 
 ### Changed
