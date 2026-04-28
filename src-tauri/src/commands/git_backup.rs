@@ -104,6 +104,27 @@ pub async fn git_backup_clone(
     .await?
 }
 
+/// Recovery: discard the local `.git` and re-clone from the configured remote.
+/// Existing skill files are preserved via the same backup-then-merge flow
+/// used by the regular clone path.
+#[tauri::command]
+pub async fn git_backup_reclone(
+    store: State<'_, Arc<SkillStore>>,
+    url: String,
+) -> Result<(), AppError> {
+    git_fetcher::validate_git_url(&url).map_err(AppError::git)?;
+    let store = store.inner().clone();
+    let skills_dir = central_repo::skills_dir();
+    tokio::task::spawn_blocking(move || {
+        git_backup::with_repo_lock(&skills_dir, "git reclone", || {
+            git_backup::reclone_from_remote_unlocked(&skills_dir, &url)?;
+            reconcile_skills_index_unlocked(&store)
+        })
+        .map_err(AppError::classify_git_error)
+    })
+    .await?
+}
+
 #[tauri::command]
 pub async fn git_backup_create_snapshot(
     store: State<'_, Arc<SkillStore>>,
