@@ -1,10 +1,13 @@
-use crate::core::skill_metadata;
 use crate::core::central_repo;
+use crate::core::skill_metadata;
 use anyhow::{Context, Result};
+use fs2::FileExt;
 use git2::{Direction, Repository};
 use sha2::{Digest, Sha256};
+use std::fs::{File, OpenOptions};
+use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{ChildStderr, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -91,6 +94,60 @@ fn repo_cache_dir(url: &str) -> PathBuf {
     central_repo::cache_dir().join("repos").join(short)
 }
 
+struct RepoCacheLock {
+    _file: File,
+}
+
+fn lock_repo_cache(cached_dir: &Path) -> Result<RepoCacheLock> {
+    if let Some(parent) = cached_dir.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let lock_path = cached_dir.with_extension("lock");
+    let file = OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .open(&lock_path)
+        .with_context(|| format!("Failed to open repo cache lock {}", lock_path.display()))?;
+    file.lock_exclusive()
+        .with_context(|| format!("Failed to lock repo cache {}", lock_path.display()))?;
+    Ok(RepoCacheLock { _file: file })
+}
+
+fn materialize_cached_repo(cached: &Path) -> Result<PathBuf> {
+    let temp_dir =
+        std::env::temp_dir().join(format!("skills-manager-clone-{}", uuid::Uuid::new_v4()));
+
+    let status = git_command()
+        .arg("clone")
+        .arg("--local")
+        .arg("--no-hardlinks")
+        .arg(cached)
+        .arg(&temp_dir)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+
+    match status {
+        Ok(s) if s.success() => return Ok(temp_dir),
+        _ => {
+            let _ = std::fs::remove_dir_all(&temp_dir);
+        }
+    }
+
+    let source = cached
+        .to_str()
+        .ok_or_else(|| anyhow::anyhow!("Cached repo path is not valid UTF-8"))?;
+    match git2::build::RepoBuilder::new().clone(source, &temp_dir) {
+        Ok(_) => Ok(temp_dir),
+        Err(err) => {
+            let _ = std::fs::remove_dir_all(&temp_dir);
+            anyhow::bail!("Failed to create install checkout from cache: {}", err)
+        }
+    }
+}
+
 /// Try to update an existing cached repo via fetch + reset.
 /// Returns Ok(true) if the cache was reused, Ok(false) if it should be re-cloned.
 fn try_update_cached_repo(
@@ -108,7 +165,9 @@ fn try_update_cached_repo(
     // Verify the remote URL still matches.
     let current_remote = {
         let mut cmd = git_command();
-        cmd.arg("-C").arg(cached).args(["remote", "get-url", "origin"]);
+        cmd.arg("-C")
+            .arg(cached)
+            .args(["remote", "get-url", "origin"]);
         let output = cmd.output().ok();
         output
             .filter(|o| o.status.success())
@@ -125,7 +184,12 @@ fn try_update_cached_repo(
     }
 
     let mut fetch_cmd = git_command();
-    fetch_cmd.arg("-C").arg(cached).arg("fetch").arg("--depth").arg("1");
+    fetch_cmd
+        .arg("-C")
+        .arg(cached)
+        .arg("fetch")
+        .arg("--depth")
+        .arg("1");
     if let Some(proxy) = proxy_url.filter(|s| !s.is_empty()) {
         fetch_cmd.arg("-c").arg(format!("http.proxy={proxy}"));
         fetch_cmd.arg("-c").arg(format!("https.proxy={proxy}"));
@@ -134,9 +198,7 @@ fn try_update_cached_repo(
     if let Some(branch) = branch {
         fetch_cmd.arg(branch);
     }
-    fetch_cmd
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped());
+    fetch_cmd.stdout(Stdio::null()).stderr(Stdio::null());
 
     let child = fetch_cmd.spawn();
     if let Ok(mut child) = child {
@@ -203,6 +265,65 @@ fn is_ssh_warning(line: &str) -> bool {
         || trimmed.starts_with("See https://openssh.com")
 }
 
+fn spawn_stderr_collector(
+    stderr: Option<ChildStderr>,
+    forward_progress: bool,
+) -> (
+    std::sync::mpsc::Receiver<String>,
+    std::thread::JoinHandle<String>,
+) {
+    let (stderr_tx, stderr_rx) = std::sync::mpsc::channel::<String>();
+    let stderr_thread = std::thread::spawn(move || {
+        let mut collected = String::new();
+        let Some(stderr) = stderr else {
+            return collected;
+        };
+
+        let mut reader = BufReader::new(stderr);
+        let mut line = Vec::new();
+        let mut byte = [0u8; 1];
+
+        loop {
+            match reader.read(&mut byte) {
+                Ok(0) => {
+                    if !line.is_empty() {
+                        emit_stderr_line(&line, forward_progress, &stderr_tx, &mut collected);
+                    }
+                    break;
+                }
+                Ok(_) if byte[0] == b'\n' || byte[0] == b'\r' => {
+                    if !line.is_empty() {
+                        emit_stderr_line(&line, forward_progress, &stderr_tx, &mut collected);
+                        line.clear();
+                    }
+                }
+                Ok(_) => line.push(byte[0]),
+                Err(_) => break,
+            }
+        }
+
+        collected
+    });
+
+    (stderr_rx, stderr_thread)
+}
+
+fn emit_stderr_line(
+    line: &[u8],
+    forward_progress: bool,
+    stderr_tx: &std::sync::mpsc::Sender<String>,
+    collected: &mut String,
+) {
+    let line = String::from_utf8_lossy(line).to_string();
+    if !is_ssh_warning(&line) {
+        collected.push_str(&line);
+        collected.push('\n');
+    }
+    if forward_progress {
+        let _ = stderr_tx.send(line);
+    }
+}
+
 pub fn clone_repo_ref(
     url: &str,
     branch: Option<&str>,
@@ -219,11 +340,13 @@ pub fn clone_repo_ref_with_progress(
     proxy_url: Option<&str>,
     on_progress: Option<ProgressCallback>,
 ) -> Result<PathBuf> {
-    // Try cached repo first.
     let cached_dir = repo_cache_dir(url);
+    let _cache_lock = lock_repo_cache(&cached_dir)?;
+
+    // Try cached repo first.
     if cached_dir.exists() {
         match try_update_cached_repo(&cached_dir, url, branch, proxy_url, cancel, &on_progress) {
-            Ok(true) => return Ok(cached_dir),
+            Ok(true) => return materialize_cached_repo(&cached_dir),
             Ok(false) => { /* cache invalid, fall through to clone */ }
             Err(e) => {
                 // Propagate cancellation.
@@ -235,10 +358,6 @@ pub fn clone_repo_ref_with_progress(
         }
     }
 
-    // Ensure cache parent exists.
-    if let Some(parent) = cached_dir.parent() {
-        std::fs::create_dir_all(parent).ok();
-    }
     // Remove any leftover partial clone.
     let _ = std::fs::remove_dir_all(&cached_dir);
 
@@ -259,69 +378,13 @@ pub fn clone_repo_ref_with_progress(
     let child = command
         .arg(url)
         .arg(&cached_dir)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn();
 
     if let Ok(mut child) = child {
-        // Spawn a thread to read stderr and forward progress.
-        let stderr = child.stderr.take();
-        let on_progress_clone = on_progress.is_some();
-        let (stderr_tx, stderr_rx) = std::sync::mpsc::channel::<String>();
-        let progress_cb_for_thread: Option<Arc<dyn Fn(&str) + Send + Sync>> =
-            on_progress.as_ref().map(|_| {
-                // We can't move the Box across threads, so we use the channel.
-                Arc::new(|_: &str| {}) as Arc<dyn Fn(&str) + Send + Sync>
-            });
-        let _ = progress_cb_for_thread; // suppress unused warning
-
-        let stderr_thread = std::thread::spawn(move || {
-            let mut collected = String::new();
-            if let Some(stderr) = stderr {
-                let mut reader = std::io::BufReader::new(stderr);
-                let mut buf = Vec::new();
-                // Read byte-by-byte splitting on both \n and \r so we capture
-                // git's carriage-return progress lines (e.g. "Receiving objects: 45%\r").
-                loop {
-                    buf.clear();
-                    let mut byte = [0u8; 1];
-                    loop {
-                        match std::io::Read::read(&mut reader, &mut byte) {
-                            Ok(0) => break,  // EOF
-                            Ok(_) => {
-                                if byte[0] == b'\n' || byte[0] == b'\r' {
-                                    break;
-                                }
-                                buf.push(byte[0]);
-                            }
-                            Err(_) => break,
-                        }
-                    }
-                    if buf.is_empty() {
-                        // Check if we hit EOF (not just an empty line between \r\n).
-                        let mut peek = [0u8; 1];
-                        match std::io::Read::read(&mut reader, &mut peek) {
-                            Ok(0) => break,
-                            Ok(_) => {
-                                // Put it back by starting next iteration with it.
-                                buf.push(peek[0]);
-                                continue;
-                            }
-                            Err(_) => break,
-                        }
-                    }
-                    let line = String::from_utf8_lossy(&buf).to_string();
-                    if !is_ssh_warning(&line) {
-                        collected.push_str(&line);
-                        collected.push('\n');
-                    }
-                    if on_progress_clone {
-                        let _ = stderr_tx.send(line);
-                    }
-                }
-            }
-            collected
-        });
+        let (stderr_rx, stderr_thread) =
+            spawn_stderr_collector(child.stderr.take(), on_progress.is_some());
 
         let deadline = Instant::now() + timeout;
         loop {
@@ -344,7 +407,7 @@ pub fn clone_repo_ref_with_progress(
                 Ok(Some(status)) => {
                     let collected = stderr_thread.join().unwrap_or_default();
                     if status.success() {
-                        return Ok(cached_dir);
+                        return materialize_cached_repo(&cached_dir);
                     }
                     system_git_stderr = Some(collected);
                     // Clean up failed clone.
@@ -402,10 +465,10 @@ pub fn clone_repo_ref_with_progress(
                 let msg = format!(
                     "Receiving objects: {}/{} ({:.1} KB)",
                     stats.received_objects(),
-                stats.total_objects(),
-                stats.received_bytes() as f64 / 1024.0
-            );
-            cb(&msg);
+                    stats.total_objects(),
+                    stats.received_bytes() as f64 / 1024.0
+                );
+                cb(&msg);
             }
         }
         true
@@ -422,7 +485,7 @@ pub fn clone_repo_ref_with_progress(
     builder.fetch_options(fetch_opts);
 
     match builder.clone(url, &cached_dir) {
-        Ok(_) => Ok(cached_dir),
+        Ok(_) => materialize_cached_repo(&cached_dir),
         Err(git2_err) => {
             let _ = std::fs::remove_dir_all(&cached_dir);
             // Include system git stderr in the error if available.
@@ -598,13 +661,7 @@ pub fn find_skill_dir(repo_dir: &Path, skill_id: Option<&str>) -> Result<PathBuf
     Ok(repo_dir.to_path_buf())
 }
 
-/// Clean up a temporary directory. Does NOT remove cached repo directories.
 pub fn cleanup_temp(path: &Path) {
-    // Don't delete if it's inside our repo cache.
-    let cache_repos = central_repo::cache_dir().join("repos");
-    if path.starts_with(&cache_repos) {
-        return;
-    }
     let _ = std::fs::remove_dir_all(path);
 }
 

@@ -1542,7 +1542,7 @@ fn validate_clone_temp_path(temp_dir: &str) -> Result<PathBuf, AppError> {
         .canonicalize()
         .map_err(|_| AppError::invalid_input("Invalid temp directory"))?;
 
-    // Allow paths inside the system temp dir (legacy random clone dirs).
+    // Preview confirmation must operate on an isolated checkout, never the repo cache.
     let expected_prefix = std::env::temp_dir()
         .canonicalize()
         .unwrap_or_else(|_| std::env::temp_dir());
@@ -1552,14 +1552,6 @@ fn validate_clone_temp_path(temp_dir: &str) -> Result<PathBuf, AppError> {
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_default();
         if dir_name_str.starts_with("skills-manager-clone-") {
-            return Ok(temp_path);
-        }
-    }
-
-    // Allow paths inside the repo cache dir.
-    let cache_repos = central_repo::cache_dir().join("repos");
-    if let Ok(cache_canon) = cache_repos.canonicalize() {
-        if temp_path.starts_with(&cache_canon) {
             return Ok(temp_path);
         }
     }
