@@ -315,22 +315,19 @@ pub fn set_tray_icon_enabled(app: &tauri::AppHandle, enabled: bool) -> Result<()
 }
 
 /// Quit the application cleanly: destroy the main window, then exit.
-/// In dev mode, also kill sibling processes in the same process group
-/// so that `tauri dev`'s beforeDevCommand (vite) gets cleaned up.
+///
+/// Do NOT signal our process group here (e.g. `kill(-pgid, SIGTERM)`).
+/// On Linux the app inherits the launcher's pgid — that may be the user's
+/// desktop session (issue #47, tearing down GNOME) or the developer's shell
+/// (terminating the parent terminal and its sibling jobs). Either is
+/// catastrophic and not worth the convenience of auto-cleaning a stray
+/// `tauri dev` vite process.
 pub fn quit_app(app: &tauri::AppHandle) {
     QUITTING.store(true, Ordering::SeqCst);
     if let Some(w) = app.get_webview_window("main") {
         if let Err(err) = w.destroy() {
             log::error!("Failed to destroy main window while quitting: {err}");
         }
-    }
-    // In dev mode, kill sibling processes (vite dev server) by signaling the process group.
-    // Uses libc directly to avoid platform-specific `kill` command syntax differences.
-    #[cfg(unix)]
-    unsafe {
-        // getpgrp() returns our process group ID; kill(-pgid, SIGTERM) sends to all in the group.
-        let pgid = libc::getpgrp();
-        libc::kill(-pgid, libc::SIGTERM);
     }
     app.exit(0);
 }
@@ -374,6 +371,8 @@ pub fn run() {
                 ensure_tray_icon(app.handle())?;
             }
 
+            core::file_watcher::start_file_watcher(app.handle().clone(), store_for_setup.clone());
+
             // Intercept window close — let frontend decide (close vs hide to tray)
             // When QUITTING is set, allow the close to proceed so the process fully exits.
             let win = app.get_webview_window("main").unwrap();
@@ -397,13 +396,16 @@ pub fn run() {
             commands::tools::set_all_tools_enabled,
             commands::tools::set_custom_tool_path,
             commands::tools::reset_custom_tool_path,
+            commands::tools::set_custom_tool_project_path,
             commands::tools::add_custom_tool,
             commands::tools::remove_custom_tool,
             // Skills
             commands::skills::get_managed_skills,
             commands::skills::get_skills_for_scenario,
             commands::skills::get_skill_document,
+            commands::skills::get_source_skill_document,
             commands::skills::delete_managed_skill,
+            commands::skills::delete_managed_skills,
             commands::skills::install_local,
             commands::skills::install_git,
             commands::skills::preview_git_install,
@@ -413,7 +415,10 @@ pub fn run() {
             commands::skills::check_skill_update,
             commands::skills::check_all_skill_updates,
             commands::skills::update_skill,
+            commands::skills::batch_update_skills,
             commands::skills::reimport_local_skill,
+            commands::skills::relink_local_skill_source,
+            commands::skills::detach_local_skill_source,
             commands::skills::get_all_tags,
             commands::skills::set_skill_tags,
             commands::skills::cancel_install,
@@ -435,11 +440,14 @@ pub fn run() {
             commands::settings::get_settings,
             commands::settings::set_settings,
             commands::settings::get_central_repo_path,
+            commands::settings::get_central_repo_path_override,
+            commands::settings::set_central_repo_path,
             commands::settings::open_central_repo_folder,
             commands::settings::check_app_update,
             commands::settings::app_exit,
             commands::settings::hide_to_tray,
             // Git Backup
+            commands::git_backup::git_backup_fetch,
             commands::git_backup::git_backup_status,
             commands::git_backup::git_backup_init,
             commands::git_backup::git_backup_set_remote,
@@ -447,14 +455,17 @@ pub fn run() {
             commands::git_backup::git_backup_push,
             commands::git_backup::git_backup_pull,
             commands::git_backup::git_backup_clone,
+            commands::git_backup::git_backup_reclone,
             commands::git_backup::git_backup_create_snapshot,
             commands::git_backup::git_backup_list_versions,
             commands::git_backup::git_backup_restore_version,
             // Projects
             commands::projects::get_projects,
             commands::projects::add_project,
+            commands::projects::add_linked_workspace,
             commands::projects::remove_project,
             commands::projects::scan_projects,
+            commands::projects::get_project_agent_targets,
             commands::projects::get_project_skills,
             commands::projects::get_project_skill_document,
             commands::projects::import_project_skill_to_center,

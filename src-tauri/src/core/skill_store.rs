@@ -76,6 +76,10 @@ pub struct ProjectRecord {
     pub id: String,
     pub name: String,
     pub path: String,
+    pub workspace_type: String,
+    pub linked_agent_key: Option<String>,
+    pub linked_agent_name: Option<String>,
+    pub disabled_path: Option<String>,
     pub sort_order: i32,
     pub created_at: i64,
     pub updated_at: i64,
@@ -121,6 +125,58 @@ impl SkillStore {
                 created_at, updated_at, status, update_status, last_checked_at, last_check_error
              )
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
+            params![
+                skill.id,
+                skill.name,
+                skill.description,
+                skill.source_type,
+                skill.source_ref,
+                skill.source_ref_resolved,
+                skill.source_subpath,
+                skill.source_branch,
+                skill.source_revision,
+                skill.remote_revision,
+                skill.central_path,
+                skill.content_hash,
+                skill.enabled,
+                skill.created_at,
+                skill.updated_at,
+                skill.status,
+                skill.update_status,
+                skill.last_checked_at,
+                skill.last_check_error,
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn upsert_skill(&self, skill: &SkillRecord) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO skills (
+                id, name, description, source_type, source_ref, source_ref_resolved, source_subpath,
+                source_branch, source_revision, remote_revision, central_path, content_hash, enabled,
+                created_at, updated_at, status, update_status, last_checked_at, last_check_error
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)
+             ON CONFLICT(id) DO UPDATE SET
+                name = excluded.name,
+                description = excluded.description,
+                source_type = excluded.source_type,
+                source_ref = excluded.source_ref,
+                source_ref_resolved = excluded.source_ref_resolved,
+                source_subpath = excluded.source_subpath,
+                source_branch = excluded.source_branch,
+                source_revision = excluded.source_revision,
+                remote_revision = excluded.remote_revision,
+                central_path = excluded.central_path,
+                content_hash = excluded.content_hash,
+                enabled = excluded.enabled,
+                updated_at = excluded.updated_at,
+                status = excluded.status,
+                update_status = excluded.update_status,
+                last_checked_at = excluded.last_checked_at,
+                last_check_error = excluded.last_check_error",
             params![
                 skill.id,
                 skill.name,
@@ -280,6 +336,15 @@ impl SkillStore {
                 update_status,
                 id
             ],
+        )?;
+        Ok(())
+    }
+
+    pub fn update_skill_source_ref(&self, id: &str, source_ref: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE skills SET source_ref = ?1 WHERE id = ?2",
+            params![source_ref, id],
         )?;
         Ok(())
     }
@@ -817,6 +882,88 @@ impl SkillStore {
         Ok(())
     }
 
+    pub fn replace_scenarios_from_metadata(
+        &self,
+        scenarios: &[super::sync_metadata::ScenarioMetaFile],
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let tx = conn.unchecked_transaction()?;
+        let metadata_ids: std::collections::HashSet<&str> =
+            scenarios.iter().map(|s| s.scenario_id.as_str()).collect();
+        {
+            let mut stmt = tx.prepare("SELECT id FROM scenarios")?;
+            let ids = stmt
+                .query_map([], |row| row.get::<_, String>(0))?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            for id in ids {
+                if !metadata_ids.contains(id.as_str()) {
+                    tx.execute("DELETE FROM scenarios WHERE id = ?1", params![id])?;
+                }
+            }
+        }
+        let now = chrono::Utc::now().timestamp_millis();
+        for scenario in scenarios {
+            tx.execute(
+                "INSERT INTO scenarios (id, name, description, icon, sort_order, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)
+                 ON CONFLICT(id) DO UPDATE SET
+                    name = excluded.name,
+                    description = excluded.description,
+                    icon = excluded.icon,
+                    sort_order = excluded.sort_order,
+                    updated_at = excluded.updated_at",
+                params![
+                    scenario.scenario_id,
+                    scenario.name,
+                    scenario.description,
+                    scenario.icon,
+                    scenario.sort_order,
+                    now,
+                ],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn replace_scenario_memberships_from_metadata(
+        &self,
+        memberships: &[super::sync_metadata::ScenarioSkillMetaFile],
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let tx = conn.unchecked_transaction()?;
+        tx.execute("DELETE FROM scenario_skill_tools", [])?;
+        tx.execute("DELETE FROM scenario_skills", [])?;
+        let now = chrono::Utc::now().timestamp_millis();
+        for member in memberships {
+            tx.execute(
+                "INSERT OR IGNORE INTO scenario_skills (scenario_id, skill_id, added_at, sort_order)
+                 VALUES (?1, ?2, ?3, ?4)",
+                params![
+                    member.scenario_id,
+                    member.skill_id,
+                    now,
+                    member.sort_order,
+                ],
+            )?;
+            for (tool, enabled) in &member.tools {
+                tx.execute(
+                    "INSERT OR REPLACE INTO scenario_skill_tools (scenario_id, skill_id, tool, enabled, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5)",
+                    params![
+                        member.scenario_id,
+                        member.skill_id,
+                        tool,
+                        enabled,
+                        now,
+                    ],
+                )?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn get_scenario_skill_tool_toggles(
         &self,
         scenario_id: &str,
@@ -888,12 +1035,19 @@ impl SkillStore {
     pub fn insert_project(&self, project: &ProjectRecord) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO projects (id, name, path, sort_order, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO projects (
+                id, name, path, workspace_type, linked_agent_key, linked_agent_name, disabled_path,
+                sort_order, created_at, updated_at
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 project.id,
                 project.name,
                 project.path,
+                project.workspace_type,
+                project.linked_agent_key,
+                project.linked_agent_name,
+                project.disabled_path,
                 project.sort_order,
                 project.created_at,
                 project.updated_at,
@@ -905,16 +1059,23 @@ impl SkillStore {
     pub fn get_all_projects(&self) -> Result<Vec<ProjectRecord>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, name, path, sort_order, created_at, updated_at FROM projects ORDER BY sort_order, created_at",
+            "SELECT id, name, path, workspace_type, linked_agent_key, linked_agent_name, disabled_path,
+                    sort_order, created_at, updated_at
+             FROM projects
+             ORDER BY sort_order, created_at",
         )?;
         let rows = stmt.query_map([], |row| {
             Ok(ProjectRecord {
                 id: row.get(0)?,
                 name: row.get(1)?,
                 path: row.get(2)?,
-                sort_order: row.get(3)?,
-                created_at: row.get(4)?,
-                updated_at: row.get(5)?,
+                workspace_type: row.get(3)?,
+                linked_agent_key: row.get(4)?,
+                linked_agent_name: row.get(5)?,
+                disabled_path: row.get(6)?,
+                sort_order: row.get(7)?,
+                created_at: row.get(8)?,
+                updated_at: row.get(9)?,
             })
         })?;
         Ok(rows.filter_map(|r| r.ok()).collect())
@@ -923,16 +1084,23 @@ impl SkillStore {
     pub fn get_project_by_id(&self, id: &str) -> Result<Option<ProjectRecord>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, name, path, sort_order, created_at, updated_at FROM projects WHERE id = ?1",
+            "SELECT id, name, path, workspace_type, linked_agent_key, linked_agent_name, disabled_path,
+                    sort_order, created_at, updated_at
+             FROM projects
+             WHERE id = ?1",
         )?;
         let mut rows = stmt.query_map(params![id], |row| {
             Ok(ProjectRecord {
                 id: row.get(0)?,
                 name: row.get(1)?,
                 path: row.get(2)?,
-                sort_order: row.get(3)?,
-                created_at: row.get(4)?,
-                updated_at: row.get(5)?,
+                workspace_type: row.get(3)?,
+                linked_agent_key: row.get(4)?,
+                linked_agent_name: row.get(5)?,
+                disabled_path: row.get(6)?,
+                sort_order: row.get(7)?,
+                created_at: row.get(8)?,
+                updated_at: row.get(9)?,
             })
         })?;
         Ok(rows.next().and_then(|r| r.ok()))
